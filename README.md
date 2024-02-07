@@ -2,7 +2,8 @@
 
 Python GUIs has a great example of [a rich-text editor in
 PyQt5](https://www.pythonguis.com/examples/python-rich-text-editor/).
-However, I'm using PyQt6, so I've updated their code to use that. Also:
+However, their code uses PyQt5. I'm using PyQt6, so I've updated their code to
+use that. Also:
 
 * black formatting for standardization
 * Refactored some repetitive code
