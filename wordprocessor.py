@@ -1,5 +1,25 @@
-from PyQt6.QtGui import QFont, QIcon, QImage, QKeySequence, QAction, QActionGroup, QTextDocument
-from PyQt6.QtWidgets import QTextEdit, QMainWindow, QVBoxLayout, QWidget, QStatusBar, QToolBar, QFileDialog, QMessageBox, QFontComboBox, QComboBox, QApplication
+from PyQt6.QtGui import (
+    QFont,
+    QIcon,
+    QImage,
+    QKeySequence,
+    QAction,
+    QActionGroup,
+    QTextDocument,
+)
+from PyQt6.QtWidgets import (
+    QTextEdit,
+    QMainWindow,
+    QVBoxLayout,
+    QWidget,
+    QStatusBar,
+    QToolBar,
+    QFileDialog,
+    QMessageBox,
+    QFontComboBox,
+    QComboBox,
+    QApplication,
+)
 from PyQt6.QtCore import QSize, Qt, QUrl
 from PyQt6.QtPrintSupport import QPrintDialog
 
@@ -52,7 +72,9 @@ class TextEdit(QTextEdit):
         elif source.hasImage():
             image = source.imageData()
             uuid = hexuuid()
-            document.addResource(QTextDocument.ResourceType.ImageResource, QUrl(uuid), image)
+            document.addResource(
+                QTextDocument.ResourceType.ImageResource, QUrl(uuid), image
+            )
             cursor.insertImage(uuid)
             return
 
