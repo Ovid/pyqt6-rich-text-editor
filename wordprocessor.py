@@ -1,4 +1,4 @@
-from PyQt6.QtGui import (
+from PySide6.QtGui import (
     QFont,
     QIcon,
     QImage,
@@ -7,7 +7,7 @@ from PyQt6.QtGui import (
     QActionGroup,
     QTextDocument,
 )
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QTextEdit,
     QMainWindow,
     QVBoxLayout,
@@ -20,8 +20,8 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QApplication,
 )
-from PyQt6.QtCore import QSize, Qt, QUrl
-from PyQt6.QtPrintSupport import QPrintDialog
+from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtPrintSupport import QPrintDialog
 
 import os
 import sys
@@ -33,7 +33,7 @@ HTML_EXTENSIONS = [".htm", ".html"]
 ADD_SEPARATOR = "addSeparator"
 
 
-def hexuuid():
+def hex_uuid():
     return uuid.uuid4().hex
 
 
@@ -57,7 +57,7 @@ class TextEdit(QTextEdit):
                 file_ext = splitext(str(u.toLocalFile()))
                 if u.isLocalFile() and file_ext in IMAGE_EXTENSIONS:
                     image = QImage(u.toLocalFile())
-                    document.addResource(QTextDocument.ImageResource, u, image)
+                    document.addResource(QTextDocument.ResourceType.ImageResource, u, image)
                     cursor.insertImage(u.toLocalFile())
 
                 else:
@@ -71,11 +71,11 @@ class TextEdit(QTextEdit):
 
         elif source.hasImage():
             image = source.imageData()
-            uuid = hexuuid()
+            uu_id = hex_uuid()
             document.addResource(
-                QTextDocument.ResourceType.ImageResource, QUrl(uuid), image
+                QTextDocument.ResourceType.ImageResource, QUrl(uu_id), image
             )
-            cursor.insertImage(uuid)
+            cursor.insertImage(uu_id)
             return
 
         super(TextEdit, self).insertFromMimeData(source)
@@ -84,10 +84,10 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-
+        self.setGeometry(100, 100, 800, 600)
         layout = QVBoxLayout()
         self.editor = TextEdit()
-        # Setup the QTextEdit editor configuration
+        # Set up the QTextEdit editor configuration
         self.editor.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
         self.editor.selectionChanged.connect(self.update_format)
         # Initialize default font size.
@@ -133,7 +133,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Save current page to specified file",
                         "menu name": "Save As...",
                         "icon": "disk--pencil.png",
-                        "trigger": self.file_saveas,
+                        "trigger": self.file_save_as,
                     },
                     {
                         "status tip": "Print current page",
@@ -230,14 +230,14 @@ class MainWindow(QMainWindow):
         self.fonts.currentFontChanged.connect(self.editor.setCurrentFont)
         format_toolbar.addWidget(self.fonts)
 
-        self.fontsize = QComboBox()
-        self.fontsize.addItems([str(s) for s in FONT_SIZES])
+        self.font_size = QComboBox()
+        self.font_size.addItems([str(s) for s in FONT_SIZES])
 
         # Connect to the signal producing the text of the current selection.
-        self.fontsize.currentIndexChanged.connect(
+        self.font_size.currentIndexChanged.connect(
             lambda s: self.editor.setFontPointSize(FONT_SIZES[s])
         )
-        format_toolbar.addWidget(self.fontsize)
+        format_toolbar.addWidget(self.font_size)
 
         self.bold_action = QAction(
             QIcon(os.path.join("icons", "edit-bold.png")), "Bold", self
@@ -275,29 +275,29 @@ class MainWindow(QMainWindow):
 
         format_menu.addSeparator()
 
-        self.alignl_action = QAction(
+        self.align_left_action = QAction(
             QIcon(os.path.join("icons", "edit-alignment.png")), "Align left", self
         )
-        self.alignl_action.setStatusTip("Align text left")
-        self.alignl_action.setCheckable(True)
-        self.alignl_action.triggered.connect(
+        self.align_left_action.setStatusTip("Align text left")
+        self.align_left_action.setCheckable(True)
+        self.align_left_action.triggered.connect(
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignLeft)
         )
-        format_toolbar.addAction(self.alignl_action)
-        format_menu.addAction(self.alignl_action)
+        format_toolbar.addAction(self.align_left_action)
+        format_menu.addAction(self.align_left_action)
 
-        self.alignc_action = QAction(
+        self.align_center_action = QAction(
             QIcon(os.path.join("icons", "edit-alignment-center.png")),
             "Align center",
             self,
         )
-        self.alignc_action.setStatusTip("Align text center")
-        self.alignc_action.setCheckable(True)
-        self.alignc_action.triggered.connect(
+        self.align_center_action.setStatusTip("Align text center")
+        self.align_center_action.setCheckable(True)
+        self.align_center_action.triggered.connect(
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         )
-        format_toolbar.addAction(self.alignc_action)
-        format_menu.addAction(self.alignc_action)
+        format_toolbar.addAction(self.align_center_action)
+        format_menu.addAction(self.align_center_action)
 
         self.alignr_action = QAction(
             QIcon(os.path.join("icons", "edit-alignment-right.png")),
@@ -312,30 +312,30 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.alignr_action)
         format_menu.addAction(self.alignr_action)
 
-        self.alignj_action = QAction(
+        self.align_justify_action = QAction(
             QIcon(os.path.join("icons", "edit-alignment-justify.png")), "Justify", self
         )
-        self.alignj_action.setStatusTip("Justify text")
-        self.alignj_action.setCheckable(True)
-        self.alignj_action.triggered.connect(
+        self.align_justify_action.setStatusTip("Justify text")
+        self.align_justify_action.setCheckable(True)
+        self.align_justify_action.triggered.connect(
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignJustify)
         )
-        format_toolbar.addAction(self.alignj_action)
-        format_menu.addAction(self.alignj_action)
+        format_toolbar.addAction(self.align_justify_action)
+        format_menu.addAction(self.align_justify_action)
 
         format_group = QActionGroup(self)
         format_group.setExclusive(True)
-        format_group.addAction(self.alignl_action)
-        format_group.addAction(self.alignc_action)
+        format_group.addAction(self.align_left_action)
+        format_group.addAction(self.align_center_action)
         format_group.addAction(self.alignr_action)
-        format_group.addAction(self.alignj_action)
+        format_group.addAction(self.align_justify_action)
 
         format_menu.addSeparator()
 
         # A list of all format-related widgets/actions, so we can disable/enable signals when updating.
         self._format_actions = [
             self.fonts,
-            self.fontsize,
+            self.font_size,
             self.bold_action,
             self.italic_action,
             self.underline_action,
@@ -347,13 +347,14 @@ class MainWindow(QMainWindow):
         self.update_title()
         self.show()
 
-    def block_signals(self, objects, b):
+    @staticmethod
+    def block_signals(objects, b):
         for o in objects:
             o.blockSignals(b)
 
     def update_format(self):
         """
-        Update the font format toolbar/actions when a new text selection is made. This is neccessary to keep
+        Update the font format toolbar/actions when a new text selection is made. This is necessary to keep
         toolbars/etc. in sync with the current edit state.
         :return:
         """
@@ -362,22 +363,22 @@ class MainWindow(QMainWindow):
 
         self.fonts.setCurrentFont(self.editor.currentFont())
         # Nasty, but we get the font-size as a float but want it was an int
-        self.fontsize.setCurrentText(str(int(self.editor.fontPointSize())))
+        self.font_size.setCurrentText(str(int(self.editor.fontPointSize())))
 
         self.italic_action.setChecked(self.editor.fontItalic())
         self.underline_action.setChecked(self.editor.fontUnderline())
         self.bold_action.setChecked(self.editor.fontWeight() == QFont.bold)
 
-        self.alignl_action.setChecked(
+        self.align_left_action.setChecked(
             self.editor.alignment() == Qt.AlignmentFlag.AlignLeft
         )
-        self.alignc_action.setChecked(
+        self.align_center_action.setChecked(
             self.editor.alignment() == Qt.AlignmentFlag.AlignCenter
         )
         self.alignr_action.setChecked(
             self.editor.alignment() == Qt.AlignmentFlag.AlignRight
         )
-        self.alignj_action.setChecked(
+        self.align_justify_action.setChecked(
             self.editor.alignment() == Qt.AlignmentFlag.AlignJustify
         )
 
@@ -386,7 +387,7 @@ class MainWindow(QMainWindow):
     def dialog_critical(self, s):
         dlg = QMessageBox(self)
         dlg.setText(s)
-        dlg.setIcon(QMessageBox.Critical)
+        dlg.setIcon(QMessageBox.StandardButton.Critical)
         dlg.show()
 
     def file_open(self):
@@ -413,7 +414,7 @@ class MainWindow(QMainWindow):
     def file_save(self):
         if self.path is None:
             # If we do not have a path, we need to use Save As.
-            return self.file_saveas()
+            return self.file_save_as()
 
         text = (
             self.editor.toHtml()
@@ -428,7 +429,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.dialog_critical(str(e))
 
-    def file_saveas(self):
+    def file_save_as(self):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save file",
@@ -469,12 +470,14 @@ class MainWindow(QMainWindow):
         )
 
     def edit_toggle_wrap(self):
-        self.editor.setLineWrapMode(1 if self.editor.lineWrapMode() == 0 else 0)
+        if self.editor.lineWrapMode() == QTextEdit.LineWrapMode.NoWrap:
+            self.editor.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
+        else:
+            self.editor.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
 
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
-
     window = MainWindow()
     app.exec()
