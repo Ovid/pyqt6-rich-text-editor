@@ -115,7 +115,7 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-    def reset(self, x=100, y=100, width=880, height=600, use_icons=True):
+    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True):
         self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
@@ -245,11 +245,13 @@ class MainWindow(QMainWindow):
             toolbar = QToolBar(menu_action["name"])
             toolbar.setIconSize(QSize(16, 16))
             self.addToolBar(toolbar)
-            menu = self.menuBar().addMenu(menu_action["menu"])
+            if use_menu:
+                menu = self.menuBar().addMenu(menu_action["menu"])
 
             for action in menu_action["actions"]:
                 if ADD_SEPARATOR == action:
-                    menu.addSeparator()
+                    if use_menu:
+                        menu.addSeparator()
                     continue
 
                 if use_icons:
@@ -267,14 +269,16 @@ class MainWindow(QMainWindow):
 
                 this_action.setStatusTip(action["status tip"])
                 this_action.triggered.connect(action["trigger"])
-                menu.addAction(this_action)
+                if use_menu:
+                    menu.addAction(this_action)
                 toolbar.addAction(this_action)
 
         # Sadly, these are not regular enough to add to the menu_actions list.
         format_toolbar = QToolBar("Format")
         format_toolbar.setIconSize(QSize(16, 16))
         self.addToolBar(format_toolbar)
-        format_menu = self.menuBar().addMenu("&Format")
+        if use_menu:
+            format_menu = self.menuBar().addMenu("&Format")
 
         # We need references to these actions/settings to update as selection changes, so attach to self.
         self.fonts = QFontComboBox()
@@ -307,7 +311,8 @@ class MainWindow(QMainWindow):
             )
         )
         format_toolbar.addAction(self.bold_action)
-        format_menu.addAction(self.bold_action)
+        if use_menu:
+            format_menu.addAction(self.bold_action)
 
         if use_icons:
             self.italic_action = QAction(
@@ -322,7 +327,8 @@ class MainWindow(QMainWindow):
         self.italic_action.setCheckable(True)
         self.italic_action.toggled.connect(self.editor.setFontItalic)
         format_toolbar.addAction(self.italic_action)
-        format_menu.addAction(self.italic_action)
+        if use_menu:
+            format_menu.addAction(self.italic_action)
 
         if use_icons:
             self.underline_action = QAction(
@@ -337,9 +343,9 @@ class MainWindow(QMainWindow):
         self.underline_action.setCheckable(True)
         self.underline_action.toggled.connect(self.editor.setFontUnderline)
         format_toolbar.addAction(self.underline_action)
-        format_menu.addAction(self.underline_action)
-
-        format_menu.addSeparator()
+        if use_menu:
+            format_menu.addAction(self.underline_action)
+            format_menu.addSeparator()
 
         if use_icons:
             self.align_left_action = QAction(
@@ -355,7 +361,8 @@ class MainWindow(QMainWindow):
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignLeft)
         )
         format_toolbar.addAction(self.align_left_action)
-        format_menu.addAction(self.align_left_action)
+        if use_menu:
+            format_menu.addAction(self.align_left_action)
 
         if use_icons:
             self.align_center_action = QAction(
@@ -373,7 +380,8 @@ class MainWindow(QMainWindow):
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         )
         format_toolbar.addAction(self.align_center_action)
-        format_menu.addAction(self.align_center_action)
+        if use_menu:
+            format_menu.addAction(self.align_center_action)
 
         if use_icons:
             self.alignr_action = QAction(
@@ -391,7 +399,8 @@ class MainWindow(QMainWindow):
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignRight)
         )
         format_toolbar.addAction(self.alignr_action)
-        format_menu.addAction(self.alignr_action)
+        if use_menu:
+            format_menu.addAction(self.alignr_action)
 
         if use_icons:
             self.align_justify_action = QAction(
@@ -407,7 +416,8 @@ class MainWindow(QMainWindow):
             lambda: self.editor.setAlignment(Qt.AlignmentFlag.AlignJustify)
         )
         format_toolbar.addAction(self.align_justify_action)
-        format_menu.addAction(self.align_justify_action)
+        if use_menu:
+            format_menu.addAction(self.align_justify_action)
 
         format_group = QActionGroup(self)
         format_group.setExclusive(True)
@@ -415,8 +425,8 @@ class MainWindow(QMainWindow):
         format_group.addAction(self.align_center_action)
         format_group.addAction(self.alignr_action)
         format_group.addAction(self.align_justify_action)
-
-        format_menu.addSeparator()
+        if use_menu:
+            format_menu.addSeparator()
 
         # A list of all format-related widgets/actions, so we can disable/enable signals when updating.
         self._format_actions = [
@@ -566,5 +576,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
     window = MainWindow()
-    window.reset( use_icons='--no-icons' not in sys.argv)
+    window.reset( use_icons='--no-icons' not in sys.argv, use_menu='--no-menu' not in sys.argv)
     app.exec()
