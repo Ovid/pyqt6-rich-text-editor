@@ -115,7 +115,7 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-    def reset(self, x=100, y=100, width=800, height=600, use_icons=True):
+    def reset(self, x=100, y=100, width=880, height=600, use_icons=True):
         self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
@@ -153,24 +153,28 @@ class MainWindow(QMainWindow):
                         "status tip": "Open File",
                         "menu name": "Open file...",
                         "icon": "blue-folder-open-document.png",
+                        "symbol":"🗁",
                         "trigger": self.file_open,
                     },
                     {
                         "status tip": "Save File",
                         "menu name": "Save",
                         "icon": "disk.png",
+                        "symbol":"🖪",
                         "trigger": self.file_save,
                     },
                     {
                         "status tip": "Save current page to specified file",
                         "menu name": "Save As...",
                         "icon": "disk--pencil.png",
+                        "symbol":"🖫",
                         "trigger": self.file_save_as,
                     },
                     {
                         "status tip": "Print current page",
                         "menu name": "Print...",
                         "icon": "printer.png",
+                        "symbol":"🖶",
                         "trigger": self.file_print,
                     },
                 ],
@@ -183,12 +187,14 @@ class MainWindow(QMainWindow):
                         "status tip": "Undo last change",
                         "menu name": "Undo",
                         "icon": "arrow-curve-180-left.png",
+                        "symbol":"⤺",
                         "trigger": self.editor.undo,
                     },
                     {
                         "status tip": "Redo last change",
                         "menu name": "Redo",
                         "icon": "arrow-curve.png",
+                        "symbol":"⤻",
                         "trigger": self.editor.redo,
                     },
                     ADD_SEPARATOR,
@@ -196,6 +202,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Cut selected text",
                         "menu name": "Cut",
                         "icon": "scissors.png",
+                        "symbol":"✂",
                         "trigger": self.editor.cut,
                         "shortcut": QKeySequence.StandardKey.Cut,
                     },
@@ -203,6 +210,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Copy selected text",
                         "menu name": "Copy",
                         "icon": "document-copy.png",
+                        "symbol":"🗈",
                         "trigger": self.editor.copy,
                         "shortcut": QKeySequence.StandardKey.Copy,
                     },
@@ -210,6 +218,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Paste from clipboard",
                         "menu name": "Paste",
                         "icon": "clipboard-paste-document-text.png",
+                        "symbol":"🗉",
                         "trigger": self.editor.paste,
                         "shortcut": QKeySequence.StandardKey.Paste,
                     },
@@ -217,6 +226,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Select all text",
                         "menu name": "Select all",
                         "icon": "selection-input.png",
+                        "symbol":"🗏",
                         "trigger": self.editor.selectAll,
                         "shortcut": QKeySequence.StandardKey.SelectAll,
                     },
@@ -225,6 +235,7 @@ class MainWindow(QMainWindow):
                         "status tip": "Toggle wrap text to window",
                         "menu name": "Wrap text to window",
                         "icon": "arrow-continue.png",
+                        "symbol":"🗞",
                         "trigger": self.edit_toggle_wrap,
                     },
                 ],
@@ -241,11 +252,19 @@ class MainWindow(QMainWindow):
                     menu.addSeparator()
                     continue
 
-                this_action = QAction(
-                    QIcon(os.path.join("icons", action["icon"])),
-                    action["menu name"],
-                    self,
-                )
+                if use_icons:
+                    this_action = QAction(
+                        QIcon(os.path.join("icons", action["icon"])),
+                        action["menu name"],
+                        self,
+                    )
+                else:
+                    if 'symbol' in action:
+                        this_action = QAction(action["symbol"],self)
+                    else:
+                        this_action = QAction(action["menu name"],self)
+                    this_action.setToolTip(action["status tip"])
+
                 this_action.setStatusTip(action["status tip"])
                 this_action.triggered.connect(action["trigger"])
                 menu.addAction(this_action)
@@ -276,7 +295,8 @@ class MainWindow(QMainWindow):
                 QIcon(os.path.join("icons", "edit-bold.png")), "Bold", self
             )
         else:
-            self.bold_action = QAction("𝐁", self)
+            self.bold_action = act = QAction("𝐁", self)
+            act.setToolTip("Bold")
 
         self.bold_action.setStatusTip("Bold")
         self.bold_action.setShortcut(QKeySequence.StandardKey.Bold)
@@ -294,7 +314,9 @@ class MainWindow(QMainWindow):
                 QIcon(os.path.join("icons", "edit-italic.png")), "Italic", self
             )
         else:
-            self.italic_action = QAction("𝒊", self)
+            self.italic_action = act = QAction("𝒊", self)
+            act.setToolTip('Italic')
+
         self.italic_action.setStatusTip("Italic")
         self.italic_action.setShortcut(QKeySequence.StandardKey.Italic)
         self.italic_action.setCheckable(True)
@@ -307,7 +329,8 @@ class MainWindow(QMainWindow):
                 QIcon(os.path.join("icons", "edit-underline.png")), "Underline", self
             )
         else:
-            self.underline_action = QAction("⎁", self)
+            self.underline_action = act = QAction("⎁", self)
+            act.setToolTip("Underline")
 
         self.underline_action.setStatusTip("Underline")
         self.underline_action.setShortcut(QKeySequence.StandardKey.Underline)
@@ -318,9 +341,14 @@ class MainWindow(QMainWindow):
 
         format_menu.addSeparator()
 
-        self.align_left_action = QAction(
-            QIcon(os.path.join("icons", "edit-alignment.png")), "Align left", self
-        )
+        if use_icons:
+            self.align_left_action = QAction(
+                QIcon(os.path.join("icons", "edit-alignment.png")), "Align left", self
+            )
+        else:
+            self.align_left_action = act = QAction("«", self)
+            act.setToolTip("Align left")
+
         self.align_left_action.setStatusTip("Align text left")
         self.align_left_action.setCheckable(True)
         self.align_left_action.triggered.connect(
@@ -329,11 +357,16 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.align_left_action)
         format_menu.addAction(self.align_left_action)
 
-        self.align_center_action = QAction(
-            QIcon(os.path.join("icons", "edit-alignment-center.png")),
-            "Align center",
-            self,
-        )
+        if use_icons:
+            self.align_center_action = QAction(
+                QIcon(os.path.join("icons", "edit-alignment-center.png")),
+                "Align center",
+                self,
+            )
+        else:
+            self.align_center_action = act = QAction("⟺",self)
+            act.setToolTip("Align center")
+
         self.align_center_action.setStatusTip("Align text center")
         self.align_center_action.setCheckable(True)
         self.align_center_action.triggered.connect(
@@ -342,11 +375,16 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.align_center_action)
         format_menu.addAction(self.align_center_action)
 
-        self.alignr_action = QAction(
-            QIcon(os.path.join("icons", "edit-alignment-right.png")),
-            "Align right",
-            self,
-        )
+        if use_icons:
+            self.alignr_action = QAction(
+                QIcon(os.path.join("icons", "edit-alignment-right.png")),
+                "Align right",
+                self,
+            )
+        else:
+            self.alignr_action = act = QAction("»",self)
+            act.setToolTip("Align right")
+
         self.alignr_action.setStatusTip("Align text right")
         self.alignr_action.setCheckable(True)
         self.alignr_action.triggered.connect(
@@ -355,9 +393,14 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.alignr_action)
         format_menu.addAction(self.alignr_action)
 
-        self.align_justify_action = QAction(
-            QIcon(os.path.join("icons", "edit-alignment-justify.png")), "Justify", self
-        )
+        if use_icons:
+            self.align_justify_action = QAction(
+                QIcon(os.path.join("icons", "edit-alignment-justify.png")), "Justify", self
+            )
+        else:
+            self.align_justify_action = act = QAction("𝄘", self)
+            act.setToolTip("Justify")
+
         self.align_justify_action.setStatusTip("Justify text")
         self.align_justify_action.setCheckable(True)
         self.align_justify_action.triggered.connect(
