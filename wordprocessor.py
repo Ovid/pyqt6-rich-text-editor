@@ -1,27 +1,58 @@
-from PySide6.QtGui import (
-    QFont,
-    QIcon,
-    QImage,
-    QKeySequence,
-    QAction,
-    QActionGroup,
-    QTextDocument,
-)
-from PySide6.QtWidgets import (
-    QTextEdit,
-    QMainWindow,
-    QVBoxLayout,
-    QWidget,
-    QStatusBar,
-    QToolBar,
-    QFileDialog,
-    QMessageBox,
-    QFontComboBox,
-    QComboBox,
-    QApplication,
-)
-from PySide6.QtCore import QSize, Qt, QUrl
-from PySide6.QtPrintSupport import QPrintDialog
+try:
+    import PySide6
+except:
+    PySide6 = None
+
+if PySide6:
+    from PySide6.QtGui import (
+        QFont,
+        QIcon,
+        QImage,
+        QKeySequence,
+        QAction,
+        QActionGroup,
+        QTextDocument,
+    )
+    from PySide6.QtWidgets import (
+        QTextEdit,
+        QMainWindow,
+        QVBoxLayout,
+        QWidget,
+        QStatusBar,
+        QToolBar,
+        QFileDialog,
+        QMessageBox,
+        QFontComboBox,
+        QComboBox,
+        QApplication,
+    )
+    from PySide6.QtCore import QSize, Qt, QUrl
+    from PySide6.QtPrintSupport import QPrintDialog
+else:
+    from PyQt6.QtGui import (
+        QFont,
+        QIcon,
+        QImage,
+        QKeySequence,
+        QAction,
+        QActionGroup,
+        QTextDocument,
+    )
+    from PyQt6.QtWidgets import (
+        QTextEdit,
+        QMainWindow,
+        QVBoxLayout,
+        QWidget,
+        QStatusBar,
+        QToolBar,
+        QFileDialog,
+        QMessageBox,
+        QFontComboBox,
+        QComboBox,
+        QApplication,
+    )
+    from PyQt6.QtCore import QSize, Qt, QUrl
+    from PyQt6.QtPrintSupport import QPrintDialog
 
 import os
 import sys
