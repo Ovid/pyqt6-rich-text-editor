@@ -26,7 +26,7 @@ if PySide6:
         QComboBox,
         QApplication,
     )
-    from PySide6.QtCore import QSize, Qt, QUrl
+    from PySide6.QtCore import QSize, Qt, QUrl, QTimer
     from PySide6.QtPrintSupport import QPrintDialog
 else:
     from PyQt6.QtGui import (
@@ -51,12 +51,10 @@ else:
         QComboBox,
         QApplication,
     )
-    from PyQt6.QtCore import QSize, Qt, QUrl
+    from PyQt6.QtCore import QSize, Qt, QUrl, QTimer
     from PyQt6.QtPrintSupport import QPrintDialog
 
-import os
-import sys
-import uuid
+import os, sys, uuid, xml.dom.minidom
 
 FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 18, 24, 36, 48, 64, 72, 96, 144, 288]
 IMAGE_EXTENSIONS = [".jpg", ".png", ".bmp"]
@@ -115,7 +113,7 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True, use_monospace=True):
+    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True, use_monospace=True, syntax_highlight=False):
         self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
@@ -447,6 +445,67 @@ class MainWindow(QMainWindow):
         self.update_title()
         self.show()
 
+        if syntax_highlight:
+            self.editor.setStyleSheet('background-color:grey; color:white')
+            self.timer = QTimer()
+            self.timer.timeout.connect(self.loop)
+            self.timer.start(2000)
+            self.prev_html = None
+
+    def loop(self):
+        html = self.editor.toHtml()
+        if html != self.prev_html:
+            cur = self.editor.textCursor()
+            pos = cur.position()
+            self.prev_html = html
+            doc = xml.dom.minidom.parseString(html)
+            for p in doc.getElementsByTagName('p'):
+                rep = {}
+                for child in p.childNodes:
+                    if child.nodeType==doc.ELEMENT_NODE:
+                        print(child.tagName)  ## br
+                    elif child.nodeType==doc.TEXT_NODE:
+                        if self.has_keywords(child.nodeValue):
+                            rep[child] = self.syntax_wrap(doc, child.nodeValue)
+                for node in rep:
+                    p.replaceChild(rep[node], node)
+            self.editor.setHtml(doc.toxml())
+            cur = self.editor.textCursor()
+            cur.setPosition(pos)
+            self.editor.setTextCursor(cur)
+
+    SYNTAX_PY = {
+        'def': 'cyan',
+        'for': 'red',
+        'in' : 'red',
+        'while': 'red',
+        'if':'red',
+        'elif':'red',
+        'else':'red',
+    }
+    def has_keywords(self, txt):
+        tokens = txt.split()
+        for kw in self.SYNTAX_PY:
+            if kw in tokens:
+                return True
+            if kw=='else' and 'else:' in tokens:
+                return True
+        return False
+
+    def syntax_wrap(self, doc, txt):
+        s = doc.createElement('span')
+        for a in txt.split(' '):
+            if a in self.SYNTAX_PY:
+                f = doc.createElement('font')
+                f.setAttribute('color', self.SYNTAX_PY[a])
+                f.appendChild(doc.createTextNode(a))
+                s.appendChild(f)
+            else:
+                s.appendChild(doc.createTextNode(a))
+            s.appendChild(doc.createTextNode(' '))
+        return s
+
+
     @staticmethod
     def block_signals(objects, b):
         for o in objects:
@@ -580,5 +639,9 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
     window = MainWindow()
-    window.reset( use_icons='--no-icons' not in sys.argv, use_menu='--no-menu' not in sys.argv)
+    window.reset(
+        use_icons='--no-icons' not in sys.argv, 
+        use_menu='--no-menu' not in sys.argv,
+        syntax_highlight='--syntax-highlight' in sys.argv,
+    )
     app.exec()
