@@ -115,7 +115,8 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-        self.setGeometry(100, 100, 800, 600)
+    def reset(self, x=100, y=100, width=800, height=600, use_icons=True):
+        self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
         # Set up the QTextEdit editor configuration
@@ -270,9 +271,13 @@ class MainWindow(QMainWindow):
         )
         format_toolbar.addWidget(self.font_size)
 
-        self.bold_action = QAction(
-            QIcon(os.path.join("icons", "edit-bold.png")), "Bold", self
-        )
+        if use_icons:
+            self.bold_action = QAction(
+                QIcon(os.path.join("icons", "edit-bold.png")), "Bold", self
+            )
+        else:
+            self.bold_action = QAction("𝐁", self)
+
         self.bold_action.setStatusTip("Bold")
         self.bold_action.setShortcut(QKeySequence.StandardKey.Bold)
         self.bold_action.setCheckable(True)
@@ -284,9 +289,12 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.bold_action)
         format_menu.addAction(self.bold_action)
 
-        self.italic_action = QAction(
-            QIcon(os.path.join("icons", "edit-italic.png")), "Italic", self
-        )
+        if use_icons:
+            self.italic_action = QAction(
+                QIcon(os.path.join("icons", "edit-italic.png")), "Italic", self
+            )
+        else:
+            self.italic_action = QAction("𝒊", self)
         self.italic_action.setStatusTip("Italic")
         self.italic_action.setShortcut(QKeySequence.StandardKey.Italic)
         self.italic_action.setCheckable(True)
@@ -294,9 +302,13 @@ class MainWindow(QMainWindow):
         format_toolbar.addAction(self.italic_action)
         format_menu.addAction(self.italic_action)
 
-        self.underline_action = QAction(
-            QIcon(os.path.join("icons", "edit-underline.png")), "Underline", self
-        )
+        if use_icons:
+            self.underline_action = QAction(
+                QIcon(os.path.join("icons", "edit-underline.png")), "Underline", self
+            )
+        else:
+            self.underline_action = QAction("⎁", self)
+
         self.underline_action.setStatusTip("Underline")
         self.underline_action.setShortcut(QKeySequence.StandardKey.Underline)
         self.underline_action.setCheckable(True)
@@ -511,4 +523,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
     window = MainWindow()
+    window.reset( use_icons='--no-icons' not in sys.argv)
     app.exec()
