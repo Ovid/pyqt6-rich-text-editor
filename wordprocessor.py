@@ -115,7 +115,7 @@ class TextEdit(QTextEdit):
 class MainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MainWindow, self).__init__(*args, **kwargs)
-    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True):
+    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True, use_monospace=True):
         self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
@@ -123,8 +123,12 @@ class MainWindow(QMainWindow):
         self.editor.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
         self.editor.selectionChanged.connect(self.update_format)
         # Initialize default font size.
-        font = QFont("Times New Roman", 12)
-        self.editor.setFont(font)
+        if use_monospace:
+            font = QFont("Monospace", 12)
+            self.editor.setFont(font)
+        else:
+            font = QFont("Times New Roman", 12)
+            self.editor.setFont(font)
         # We need to repeat the size to init the current format.
         self.editor.setFontPointSize(12)
 
