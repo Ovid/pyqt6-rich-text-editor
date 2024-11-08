@@ -54,13 +54,16 @@ else:
     from PyQt6.QtCore import QSize, Qt, QUrl, QTimer
     from PyQt6.QtPrintSupport import QPrintDialog
 
-import os, sys, uuid, xml.dom.minidom
+import os, sys, uuid, xml.dom.minidom, subprocess
 
 FONT_SIZES = [7, 8, 9, 10, 11, 12, 13, 14, 18, 24, 36, 48, 64, 72, 96, 144, 288]
 IMAGE_EXTENSIONS = [".jpg", ".png", ".bmp"]
 HTML_EXTENSIONS = [".htm", ".html"]
 ADD_SEPARATOR = "addSeparator"
 
+CONVERT = None
+if os.path.isfile('/usr/bin/convert'):
+    CONVERT = 'convert'
 
 def hex_uuid():
     return uuid.uuid4().hex
@@ -110,10 +113,10 @@ class TextEdit(QTextEdit):
         super(TextEdit, self).insertFromMimeData(source)
 
 
-class MainWindow(QMainWindow):
+class MegasolidEditor(QMainWindow):
     def __init__(self, *args, **kwargs):
-        super(MainWindow, self).__init__(*args, **kwargs)
-    def reset(self, x=100, y=100, width=880, height=600, use_icons=True, use_menu=True, use_monospace=True, syntax_highlight=False):
+        super(MegasolidEditor, self).__init__(*args, **kwargs)
+    def reset(self, x=100, y=100, width=840, height=600, use_icons=True, use_menu=True, use_monospace=True):
         self.setGeometry(x, y, width, height)
         layout = QVBoxLayout()
         self.editor = TextEdit()
@@ -276,7 +279,7 @@ class MainWindow(QMainWindow):
                 toolbar.addAction(this_action)
 
         # Sadly, these are not regular enough to add to the menu_actions list.
-        format_toolbar = QToolBar("Format")
+        self.format_toolbar = format_toolbar = QToolBar("Format")
         format_toolbar.setIconSize(QSize(16, 16))
         self.addToolBar(format_toolbar)
         if use_menu:
@@ -445,67 +448,6 @@ class MainWindow(QMainWindow):
         self.update_title()
         self.show()
 
-        if syntax_highlight:
-            self.editor.setStyleSheet('background-color:grey; color:white')
-            self.timer = QTimer()
-            self.timer.timeout.connect(self.loop)
-            self.timer.start(2000)
-            self.prev_html = None
-
-    def loop(self):
-        html = self.editor.toHtml()
-        if html != self.prev_html:
-            cur = self.editor.textCursor()
-            pos = cur.position()
-            self.prev_html = html
-            doc = xml.dom.minidom.parseString(html)
-            for p in doc.getElementsByTagName('p'):
-                rep = {}
-                for child in p.childNodes:
-                    if child.nodeType==doc.ELEMENT_NODE:
-                        print(child.tagName)  ## br
-                    elif child.nodeType==doc.TEXT_NODE:
-                        if self.has_keywords(child.nodeValue):
-                            rep[child] = self.syntax_wrap(doc, child.nodeValue)
-                for node in rep:
-                    p.replaceChild(rep[node], node)
-            self.editor.setHtml(doc.toxml())
-            cur = self.editor.textCursor()
-            cur.setPosition(pos)
-            self.editor.setTextCursor(cur)
-
-    SYNTAX_PY = {
-        'def': 'cyan',
-        'for': 'red',
-        'in' : 'red',
-        'while': 'red',
-        'if':'red',
-        'elif':'red',
-        'else':'red',
-    }
-    def has_keywords(self, txt):
-        tokens = txt.split()
-        for kw in self.SYNTAX_PY:
-            if kw in tokens:
-                return True
-            if kw=='else' and 'else:' in tokens:
-                return True
-        return False
-
-    def syntax_wrap(self, doc, txt):
-        s = doc.createElement('span')
-        for a in txt.split(' '):
-            if a in self.SYNTAX_PY:
-                f = doc.createElement('font')
-                f.setAttribute('color', self.SYNTAX_PY[a])
-                f.appendChild(doc.createTextNode(a))
-                s.appendChild(f)
-            else:
-                s.appendChild(doc.createTextNode(a))
-            s.appendChild(doc.createTextNode(' '))
-        return s
-
-
     @staticmethod
     def block_signals(objects, b):
         for o in objects:
@@ -634,14 +576,180 @@ class MainWindow(QMainWindow):
         else:
             self.editor.setLineWrapMode(QTextEdit.LineWrapMode.NoWrap)
 
+class MegasolidCodeEditor( MegasolidEditor ):
+    def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False):
+        super(MegasolidCodeEditor,self).reset(x,y,width,height, use_icons=use_icons, use_menu=use_menu, use_monospace=True)
+        self.setStyleSheet('background-color:rgb(42,42,42); color:lightgrey')
+        self.editor.setStyleSheet('background-color:rgb(42,42,42); color:white')
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.loop)
+        self.timer.start(3000)
+        self.prev_html = None
+        self.use_syntax_highlight = True
+        self.use_syntax_highlight_action = act = QAction("🗹", self)
+        act.setToolTip("toggle syntax highlighting")
+        act.setStatusTip("toggle syntax highlighting")
+        act.setCheckable(True)
+        act.setChecked(True)
+        act.toggled.connect( lambda x,a=act: self.toggle_syntax_highlight(x,a) )
+        self.format_toolbar.addAction(act)
+
+    def toggle_syntax_highlight(self, val, btn):
+        self.use_syntax_highlight = val
+        if val:
+            btn.setText('🗹')
+        else:
+            btn.setText('🗶')
+
+    SYNTAX_PY = {
+        'def': 'cyan',
+        'assert':'cyan',
+        'for': 'red',
+        'in' : 'red',
+        'while': 'red',
+        'if':'red',
+        'elif':'red',
+        'else':'red',
+        'class':'red',
+        'return':'red',
+    }
+    SYNTAX_C = {
+        'void'   : 'yellow',
+        'static' : 'yellow',
+        'const'  : 'yellow',
+        'struct' : 'yellow',
+    }
+    C_TYPES = ['char', 'short', 'int', 'long', 'float', 'double']
+    for _ in C_TYPES: SYNTAX_C[_]='lightgreen'
+    SYNTAX_C3 = {}
+    C3_KEYWORDS = ['true', 'false', 'fn', 'extern', 'ichar', 'ushort', 'float16', 'bool', 'bitstruct', 'distinct', 'import']
+    C3_ATTRS = ['@wasm', '@packed', '@adhoc', '@align', '@benchmark', '@bigendian', '@builtin', 
+        '@callc', '@deprecated', '@export', '@finalizer', '@if', '@init', '@inline', '@littleendian',
+        '@local', '@maydiscard', '@naked', '@nodiscard', '@noinit', '@norecurse', '@noreturn', '@nostrip',
+        '@obfuscate', '@operator', '@overlap', '@private', '@pure', '@reflect', '@section', '@test',
+        '@unused', '@weak',
+    ]
+    for _ in C3_KEYWORDS+C3_ATTRS: SYNTAX_C3[_]='pink'
+
+    ZIG_TYPES = ['i%s'%i for i in (8,16,32,64,128)] + ['u%s'%i for i in (8,16,32,64,128)] + ['f16', 'f32', 'f64', 'f80', 'f128']
+    ZIG_TYPES += 'isize usize c_char c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong anyopaque type anyerror comptime_int comptime_float'
+    SYNTAX_ZIG = {
+        '@intCast' : 'orange',
+        '@intFromFloat' : 'orange',
+    }
+    ZIG_KEYWORDS = 'defer null undefined try pub comptime var or callconv export'.split()
+    for _ in ZIG_KEYWORDS + ZIG_TYPES: SYNTAX_ZIG[_]='orange'
+
+    SYNTAX = {}
+    SYNTAX.update(SYNTAX_PY)
+    SYNTAX.update(SYNTAX_C)
+    SYNTAX.update(SYNTAX_C3)
+    SYNTAX.update(SYNTAX_ZIG)
+
+    def has_keywords(self, txt):
+        tokens = txt.split()
+        for kw in self.SYNTAX:
+            if kw in tokens:
+                return True
+        return False
+
+    def tokenize(self, txt):
+        toks = []
+        for c in txt:
+            if c==self.OBJ_REP:
+                toks.append(c)
+            elif c in (' ', '\t'):
+                if not toks or type(toks[-1]) is not list:
+                    toks.append([])
+                toks[-1].append(c)
+            elif c == '\n':
+                toks.append(b'\n')
+            elif c in '()[]{}:':
+                toks.append(tuple([c]))
+            else:
+                if not toks or type(toks[-1]) is not str:
+                    toks.append('')
+                toks[-1] += c
+        return toks
+
+    ## https://qthub.com/static/doc/qt5/qtgui/qtextdocument.html#toPlainText
+    ## Note: Embedded objects, such as images, are represented by a Unicode value U+FFFC (OBJECT REPLACEMENT CHARACTER).
+    OBJ_REP = chr(65532)
+    def loop(self):
+        if not self.use_syntax_highlight:
+            return
+        h = self.editor.toHtml()
+        if h != self.prev_html:
+            d = xml.dom.minidom.parseString(h)
+            images = [img.getAttribute('src') for img in d.getElementsByTagName('img')]
+
+            txt = self.editor.toPlainText()
+            toks = self.tokenize(txt)
+
+            cur = self.editor.textCursor()
+            pos = cur.position()
+            doc = xml.dom.minidom.Document()
+            p = doc.createElement('p')
+            p.setAttribute('style', 'margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; white-space: pre-wrap;')
+            img_index = 0
+            #print(images)
+            for tok in toks:
+                if tok==self.OBJ_REP:
+                    img = doc.createElement('img')
+                    src = images[ img_index ]
+                    if CONVERT and not src.startswith('/tmp'):
+                        a,b = os.path.split(src)
+                        tmp = '/tmp/%s.png'%b
+                        cmd = [CONVERT, src, '-resize', '128x128', tmp]
+                        print(cmd)
+                        subprocess.check_call(cmd)
+                        src = tmp
+
+                    img_index += 1
+                    img.setAttribute('src', src)
+                    p.appendChild(img)
+                elif type(tok) is bytes:
+                    p.appendChild(doc.createElement('br'))
+                elif type(tok) is str:
+                    if tok in self.SYNTAX:
+                        f = doc.createElement('font')
+                        f.setAttribute('color', self.SYNTAX[tok])
+                        f.appendChild(doc.createTextNode(tok))
+                        p.appendChild(f)
+                    else:
+                        p.appendChild(doc.createTextNode(tok))
+                elif type(tok) in (list,tuple):
+                    p.appendChild(doc.createTextNode(''.join(tok)))
+
+            html = p.toxml()
+            html = html.replace('<br />', '<br/>')
+            o = []
+            for idx, ln in enumerate(html.split('<br/>')):
+                if '{' in ln and ln.count('{')==ln.count('}'):
+                    ln = ln.replace('{', '{<u style="background-color:blue">')
+                    ln = ln.replace('}', '</u>}')
+                o.append(ln)
+            html = '<br/>'.join(o)
+
+            html = html.replace('[', '[<b style="background-color:purple">')
+            html = html.replace(']', '</b>]')
+
+            html = html.replace('(', '<i style="background-color:black">(')
+            html = html.replace(')', ')</i>')
+
+            self.editor.setHtml(html)
+            self.prev_html = self.editor.toHtml()
+            cur = self.editor.textCursor()
+            cur.setPosition(pos)
+            self.editor.setTextCursor(cur)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
-    window = MainWindow()
-    window.reset(
-        use_icons='--no-icons' not in sys.argv, 
-        use_menu='--no-menu' not in sys.argv,
-        syntax_highlight='--syntax-highlight' in sys.argv,
-    )
+    if '--code-editor' in sys.argv:
+        window = MegasolidCodeEditor()
+    else:
+        window = MegasolidEditor()
+    window.reset()
     app.exec()
