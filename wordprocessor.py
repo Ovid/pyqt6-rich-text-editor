@@ -12,11 +12,14 @@ if PySide6:
         QAction,
         QActionGroup,
         QTextDocument,
+        QPixmap,
     )
     from PySide6.QtWidgets import (
+        QLabel,
         QTextEdit,
         QMainWindow,
         QVBoxLayout,
+        QHBoxLayout,
         QWidget,
         QStatusBar,
         QToolBar,
@@ -37,11 +40,14 @@ else:
         QAction,
         QActionGroup,
         QTextDocument,
+        QPixmap,
     )
     from PyQt6.QtWidgets import (
+        QLabel,
         QTextEdit,
         QMainWindow,
         QVBoxLayout,
+        QHBoxLayout,
         QWidget,
         QStatusBar,
         QToolBar,
@@ -116,9 +122,11 @@ class TextEdit(QTextEdit):
 class MegasolidEditor(QMainWindow):
     def __init__(self, *args, **kwargs):
         super(MegasolidEditor, self).__init__(*args, **kwargs)
+        self.left_widget = None
+        self.right_widget = None
     def reset(self, x=100, y=100, width=840, height=600, use_icons=True, use_menu=True, use_monospace=True):
         self.setGeometry(x, y, width, height)
-        layout = QVBoxLayout()
+        layout = QHBoxLayout()
         self.editor = TextEdit()
         # Set up the QTextEdit editor configuration
         self.editor.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
@@ -130,14 +138,17 @@ class MegasolidEditor(QMainWindow):
         else:
             font = QFont("Times New Roman", 12)
             self.editor.setFont(font)
+
         # We need to repeat the size to init the current format.
         self.editor.setFontPointSize(12)
-
         # self.path holds the path of the currently open file.
         # If none, we haven't got a file open yet (or creating new).
         self.path = None
-
+        if self.left_widget:
+            layout.addWidget(self.left_widget)
         layout.addWidget(self.editor)
+        if self.right_widget:
+            layout.addWidget(self.right_widget)
 
         container = QWidget()
         container.setLayout(layout)
@@ -578,7 +589,25 @@ class MegasolidEditor(QMainWindow):
 
 class MegasolidCodeEditor( MegasolidEditor ):
     def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False):
+        layout = QVBoxLayout()
+        container = QWidget()
+        container.setLayout(layout)
+        self.line_counts = QLabel('.')
+        layout.addWidget(self.line_counts)
+        layout.addStretch(1)
+        self.left_widget = container
+        self.images_layout = None
+        self.qimages = {}
+        if CONVERT:
+            layout = QVBoxLayout()
+            container = QWidget()
+            container.setLayout(layout)
+            layout.addStretch(1)
+            self.right_widget = container
+            self.images_layout = layout
+
         super(MegasolidCodeEditor,self).reset(x,y,width,height, use_icons=use_icons, use_menu=use_menu, use_monospace=True)
+
         self.setStyleSheet('background-color:rgb(42,42,42); color:lightgrey')
         self.editor.setStyleSheet('background-color:rgb(42,42,42); color:white')
         self.timer = QTimer()
@@ -632,7 +661,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
     for _ in C3_KEYWORDS+C3_ATTRS: SYNTAX_C3[_]='pink'
 
     ZIG_TYPES = ['i%s'%i for i in (8,16,32,64,128)] + ['u%s'%i for i in (8,16,32,64,128)] + ['f16', 'f32', 'f64', 'f80', 'f128']
-    ZIG_TYPES += 'isize usize c_char c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong anyopaque type anyerror comptime_int comptime_float'
+    ZIG_TYPES += 'isize usize c_char c_short c_ushort c_int c_uint c_long c_ulong c_longlong c_ulonglong anyopaque type anyerror comptime_int comptime_float'.split()
     SYNTAX_ZIG = {
         '@intCast' : 'orange',
         '@intFromFloat' : 'orange',
@@ -700,7 +729,20 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     if CONVERT and not src.startswith('/tmp'):
                         a,b = os.path.split(src)
                         tmp = '/tmp/%s.png'%b
-                        cmd = [CONVERT, src, '-resize', '128x128', tmp]
+                        if tmp not in self.qimages:
+                            cmd = [CONVERT, src, '-resize', '256x256', tmp]
+                            print(cmd)
+                            subprocess.check_call(cmd)
+                            qimg = QImage(tmp)
+                            #print(dir(qimg))
+                            #print(dir(self.images_layout))
+                            qlab = QLabel()
+                            qlab.setPixmap(QPixmap.fromImage(qimg))
+                            print(dir(qlab))
+                            self.images_layout.addWidget(qlab)
+                            self.qimages[tmp]=qimg
+
+                        cmd = [CONVERT, src, '-resize', '32x32', tmp]
                         print(cmd)
                         subprocess.check_call(cmd)
                         src = tmp
@@ -724,11 +766,14 @@ class MegasolidCodeEditor( MegasolidEditor ):
             html = p.toxml()
             html = html.replace('<br />', '<br/>')
             o = []
+            lines = []
             for idx, ln in enumerate(html.split('<br/>')):
                 if '{' in ln and ln.count('{')==ln.count('}'):
                     ln = ln.replace('{', '{<u style="background-color:blue">')
                     ln = ln.replace('}', '</u>}')
                 o.append(ln)
+                lines.append(str(idx+1))
+            self.line_counts.setText( "<p style='line-height: 1.1;'>%s</p>" % '<br/>'.join(lines))
             html = '<br/>'.join(o)
 
             html = html.replace('[', '[<b style="background-color:purple">')
