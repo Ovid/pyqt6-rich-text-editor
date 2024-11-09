@@ -15,6 +15,8 @@ if PySide6:
         QPixmap,
     )
     from PySide6.QtWidgets import (
+        QTableWidgetItem,
+        QTableWidget,
         QLabel,
         QTextEdit,
         QMainWindow,
@@ -43,6 +45,8 @@ else:
         QPixmap,
     )
     from PyQt6.QtWidgets import (
+        QTableWidgetItem,
+        QTableWidget,
         QLabel,
         QTextEdit,
         QMainWindow,
@@ -675,6 +679,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
         if url.isdigit():
             index = int(url)
             print('clicked on table:', index)
+            tab = self.table_to_qt(self.tables[index])
+            self.images_layout.addWidget(tab)
+            tab.show()
 
     def toggle_syntax_highlight(self, val, btn):
         self.use_syntax_highlight = val
@@ -868,6 +875,30 @@ class MegasolidCodeEditor( MegasolidEditor ):
             cur.setPosition(pos)
             self.editor.setTextCursor(cur)
 
+
+    def table_to_qt(self, elt):
+        tab = QTableWidget()
+        tab.setStyleSheet('background-color:white; color:black;')
+        rows = elt.getElementsByTagName('tr')
+        tab.setRowCount(len(rows))
+        tab.setColumnCount( len(rows[0].getElementsByTagName('td')) )
+        for y, tr in enumerate( elt.getElementsByTagName('tr') ):
+            for x, td in enumerate( tr.getElementsByTagName('td') ):
+                txt = getText(td.childNodes).strip()
+                print(x,y, txt)
+                tab.setItem(y,x, QTableWidgetItem(txt))
+
+        tab.resizeColumnsToContents()
+        return tab
+
+def getText(nodelist):
+    rc = []
+    for node in nodelist:
+        if node.nodeType == node.TEXT_NODE:
+            rc.append(node.data)
+        else:
+            rc.append(getText(node.childNodes))
+    return ''.join(rc)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
