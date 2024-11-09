@@ -67,10 +67,6 @@ IMAGE_EXTENSIONS = [".jpg", ".png", ".bmp"]
 HTML_EXTENSIONS = [".htm", ".html"]
 ADD_SEPARATOR = "addSeparator"
 
-CONVERT = None
-if os.path.isfile('/usr/bin/convert'):
-    CONVERT = 'convert'
-
 def hex_uuid():
     return uuid.uuid4().hex
 
@@ -636,13 +632,13 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.left_widget = container
         self.images_layout = None
         self.qimages = {}
-        if CONVERT:
-            layout = QVBoxLayout()
-            container = QWidget()
-            container.setLayout(layout)
-            layout.addStretch(1)
-            self.right_widget = container
-            self.images_layout = layout
+
+        layout = QVBoxLayout()
+        container = QWidget()
+        container.setLayout(layout)
+        layout.addStretch(1)
+        self.right_widget = container
+        self.images_layout = layout
 
         super(MegasolidCodeEditor,self).reset(
             x,y,width,height, 
@@ -670,6 +666,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
         act.setChecked(True)
         act.toggled.connect( lambda x,a=act: self.toggle_syntax_highlight(x,a) )
         self.format_toolbar.addAction(act)
+
+        if sys.platform=='win32' and not os.path.isdir('/tmp'):
+            os.mkdir('/tmp')
 
 
     def on_link_clicked(self, url):
@@ -795,7 +794,6 @@ class MegasolidCodeEditor( MegasolidEditor ):
             img_index = 0
             tab_index = 0
             nodes = []
-            #print(images)
             for tok in toks:
                 if tok==self.OBJ_TABLE:
                     tab = self.tables[tab_index]
@@ -807,66 +805,39 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
                     nodes.append(anchor)
                     tab_index += 1
-
-                    if False:
-                        tab_n = len(tab.getElementsByTagName('br'))
-                        tab_n += len(tab.getElementsByTagName('tr'))
-                        tab_n += len(tab.getElementsByTagName('td'))
-                        tab_n += 1
-                        print('tab_n', tab_n)
-                        nodes.reverse()
-                        while tab_n:
-                            print(nodes)
-                            elt=nodes.pop()
-                            if elt.nodeType==elt.ELEMENT_NODE and elt.tagName=='br':
-                                tab_n -= 1
-                        nodes.reverse()
-                        nodes.append(tab)
-                        nodes.append(doc.createTextNode(self.OBJ_TABLE))
                 elif tok==self.OBJ_REP:
                     img = doc.createElement('img')
                     src = images[ img_index ]
-                    if CONVERT and not src.startswith('/tmp'):
+                    if not src.startswith('/tmp'):
+                        q = QImage(src)
                         a,b = os.path.split(src)
                         tmp = '/tmp/%s.png'%b
                         if tmp not in self.qimages:
-                            cmd = [CONVERT, src, '-resize', '256x256', tmp]
-                            print(cmd)
-                            subprocess.check_call(cmd)
-                            qimg = QImage(tmp)
-                            #print(dir(qimg))
-                            #print(dir(self.images_layout))
                             qlab = QLabel()
-                            qlab.setPixmap(QPixmap.fromImage(qimg))
-                            print(dir(qlab))
+                            qs = q.scaled(256,256, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                            qlab.setPixmap(QPixmap.fromImage(qs))
                             self.images_layout.addWidget(qlab)
-                            self.qimages[tmp]=qimg
+                            self.qimages[tmp]=qlab
 
-                        cmd = [CONVERT, src, '-resize', '32x32', tmp]
-                        print(cmd)
-                        subprocess.check_call(cmd)
+                        qs = q.scaled(32,32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                        qs.save(tmp)
                         src = tmp
 
                     img_index += 1
                     img.setAttribute('src', src)
-                    #p.appendChild(img)
                     nodes.append(img)
                 elif type(tok) is bytes:
                     assert tok==b'\n'
-                    #p.appendChild(doc.createElement('br'))
                     nodes.append( doc.createElement('br') )
                 elif type(tok) is str:
                     if tok in self.SYNTAX:
                         f = doc.createElement('font')
                         f.setAttribute('color', self.SYNTAX[tok])
                         f.appendChild(doc.createTextNode(tok))
-                        #p.appendChild(f)
                         nodes.append(f)
                     else:
-                        #p.appendChild(doc.createTextNode(tok))
                         nodes.append(doc.createTextNode(tok))
                 elif type(tok) in (list,tuple):
-                    #p.appendChild(doc.createTextNode(''.join(tok)))
                     nodes.append(doc.createTextNode(''.join(tok)))
 
             for elt in nodes:
