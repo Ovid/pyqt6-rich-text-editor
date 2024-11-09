@@ -15,6 +15,7 @@ if PySide6:
         QPixmap,
     )
     from PySide6.QtWidgets import (
+        QToolTip,
         QTableWidgetItem,
         QTableWidget,
         QLabel,
@@ -45,6 +46,7 @@ else:
         QPixmap,
     )
     from PyQt6.QtWidgets import (
+        QToolTip,
         QTableWidgetItem,
         QTableWidget,
         QLabel,
@@ -80,6 +82,18 @@ def splitext(p):
 
 
 class TextEdit(QTextEdit):
+    def mouseMoveEvent(self, event):
+        text_cursor = self.cursorForPosition(event.pos())
+        text_position = text_cursor.position()
+        self.mouse_over_anchor=self.mouse_over_symbol=None
+        if text_position:
+            self.mouse_over_anchor = self.anchorAt(event.pos())
+            txt = self.toPlainText()
+            if text_position < len(txt):
+                self.mouse_over_symbol = self.toPlainText()[text_position]
+                if self.mouse_over_anchor and hasattr(self, 'on_mouse_over_anchor'):
+                    self.on_mouse_over_anchor(event, self.mouse_over_anchor, self.mouse_over_symbol)
+
     def mousePressEvent(self, e):
         self.anchor = self.anchorAt(e.pos())
         super(TextEdit,self).mousePressEvent(e)
@@ -117,7 +131,10 @@ class TextEdit(QTextEdit):
                 if len(tables):
                     for tab in tables:
                         cursor.insertHtml('<a href="%s" style="color:blue">▦</a>' % len(self.tables))
-                        self.tables.append(tab)
+                        if hasattr(self, 'on_new_table'):
+                            self.tables.append(self.on_new_table(tab))
+                        else:
+                            self.tables.append(tab)
 
                 else:
                     cursor.insertHtml(html)
@@ -182,7 +199,7 @@ class MegasolidEditor(QMainWindow):
         self.path = None
         if self.left_widget:
             layout.addWidget(self.left_widget)
-        layout.addWidget(self.editor)
+        layout.addWidget(self.editor, stretch=1)
         if self.right_widget:
             layout.addWidget(self.right_widget)
 
@@ -656,7 +673,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.setStyleSheet('background-color:rgb(42,42,42); color:lightgrey')
         self.editor.setStyleSheet('background-color:rgb(42,42,42); color:white')
 
-        self.editor.on_link_clicked = lambda url: self.on_link_clicked(url)
+        self.editor.on_link_clicked = self.on_link_clicked
+        self.editor.on_new_table = self.on_new_table
+        self.editor.on_mouse_over_anchor = self.on_mouse_over_anchor
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.loop)
@@ -674,14 +693,6 @@ class MegasolidCodeEditor( MegasolidEditor ):
         if sys.platform=='win32' and not os.path.isdir('/tmp'):
             os.mkdir('/tmp')
 
-
-    def on_link_clicked(self, url):
-        if url.isdigit():
-            index = int(url)
-            print('clicked on table:', index)
-            tab = self.table_to_qt(self.tables[index])
-            self.images_layout.addWidget(tab)
-            tab.show()
 
     def toggle_syntax_highlight(self, val, btn):
         self.use_syntax_highlight = val
@@ -781,9 +792,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
                    print(i+1,ln.encode('utf-8'))
                 raise err
 
-            tables = [elt for elt in d.getElementsByTagName('table')]
-            if tables:
-                self.tables = tables
+            #tables = [elt for elt in d.getElementsByTagName('table')]
+            #if tables:
+            #    self.tables = tables
             images = [img.getAttribute('src') for img in d.getElementsByTagName('img')]
 
             txt = self.editor.toPlainText()
@@ -822,9 +833,10 @@ class MegasolidCodeEditor( MegasolidEditor ):
                         if tmp not in self.qimages:
                             qlab = QLabel()
                             qs = q.scaled(256,256, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                            qlab.setPixmap(QPixmap.fromImage(qs))
+                            qpix = QPixmap.fromImage(qs)
+                            qlab.setPixmap(qpix)
                             self.images_layout.addWidget(qlab)
-                            self.qimages[tmp]=qlab
+                            self.qimages[tmp]=qpix
 
                         qs = q.scaled(32,32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                         qs.save(tmp)
@@ -832,7 +844,10 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
                     img_index += 1
                     img.setAttribute('src', src)
-                    nodes.append(img)
+                    anchor = doc.createElement('a')
+                    anchor.setAttribute('href', src)
+                    anchor.appendChild(img)
+                    nodes.append(anchor)
                 elif type(tok) is bytes:
                     assert tok==b'\n'
                     nodes.append( doc.createElement('br') )
@@ -876,6 +891,22 @@ class MegasolidCodeEditor( MegasolidEditor ):
             self.editor.setTextCursor(cur)
 
 
+    def on_link_clicked(self, url):
+        print('clicked:', url)
+        if url.isdigit():
+            index = int(url)
+            print('clicked on table:', index)
+            tab = self.table_to_qt(self.tables[index])
+            clear_layout(self.images_layout)
+            self.images_layout.addWidget(tab)
+            tab.show()
+        elif url in self.qimages:
+            qlab = QLabel()
+            qlab.setPixmap(self.qimages[url])
+            clear_layout(self.images_layout)
+            self.images_layout.addWidget(qlab)
+            qlab.show()
+
     def table_to_qt(self, elt):
         tab = QTableWidget()
         tab.setStyleSheet('background-color:white; color:black;')
@@ -884,21 +915,64 @@ class MegasolidCodeEditor( MegasolidEditor ):
         tab.setColumnCount( len(rows[0].getElementsByTagName('td')) )
         for y, tr in enumerate( elt.getElementsByTagName('tr') ):
             for x, td in enumerate( tr.getElementsByTagName('td') ):
-                txt = getText(td.childNodes).strip()
+                txt = get_dom_text(td.childNodes).strip()
                 print(x,y, txt)
                 tab.setItem(y,x, QTableWidgetItem(txt))
 
         tab.resizeColumnsToContents()
         return tab
 
-def getText(nodelist):
+    def on_new_table(self, elt):
+        tab = self.table_to_qt(elt)
+        clear_layout(self.images_layout)
+        self.images_layout.addStretch(1)
+        self.images_layout.addWidget(tab)
+        return elt
+
+    def on_mouse_over_anchor(self, event, url, sym):
+        if sym==self.OBJ_TABLE:
+            assert url.isdigit()
+            tab = self.tables[int(url)]
+            arr = self.table_to_code(tab)
+            print(arr)
+            QToolTip.showText(event.globalPosition().toPoint(), arr)
+
+    def table_to_code(self, elt):
+        o = []
+        rows = elt.getElementsByTagName('tr')
+        if len(rows)==1:
+            tr = rows[0]
+            for x, td in enumerate( tr.getElementsByTagName('td') ):
+                txt = get_dom_text(td.childNodes).strip()
+                o.append(txt)
+        else:
+            for y, tr in enumerate( rows ):
+                r = []
+                for x, td in enumerate( tr.getElementsByTagName('td') ):
+                    txt = get_dom_text(td.childNodes).strip()
+                    if not txt:
+                        r.append('0')
+                    else:
+                        r.append(txt)
+                o.append('{%s}' % ','.join(r))
+
+        return '{%s}' % ','.join(o)
+
+
+def get_dom_text(nodelist):
     rc = []
     for node in nodelist:
         if node.nodeType == node.TEXT_NODE:
             rc.append(node.data)
         else:
-            rc.append(getText(node.childNodes))
+            rc.append(get_dom_text(node.childNodes))
     return ''.join(rc)
+
+def clear_layout(layout):
+    for i in reversed(range(layout.count())):
+        widget = layout.itemAt(i).widget()
+        if widget is not None: widget.setParent(None)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
