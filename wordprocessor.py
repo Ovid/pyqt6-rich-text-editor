@@ -80,6 +80,20 @@ def splitext(p):
 
 
 class TextEdit(QTextEdit):
+    def mousePressEvent(self, e):
+        self.anchor = self.anchorAt(e.pos())
+        super(TextEdit,self).mousePressEvent(e)
+
+    def mouseReleaseEvent(self, e):
+        if self.anchor:
+            if hasattr(self, 'on_link_clicked'):
+                self.on_link_clicked(self.anchor)
+            else:
+                print('clicked anchor href:', self.anchor)
+                webbrowser.open(self.anchor)
+            self.anchor = None
+        super(TextEdit,self).mouseReleaseEvent(e)
+
     def canInsertFromMimeData(self, source):
         if source.hasImage():
             return True
@@ -89,8 +103,28 @@ class TextEdit(QTextEdit):
     def insertFromMimeData(self, source):
         cursor = self.textCursor()
         document = self.document()
+        if source.hasHtml():
+            html = source.html()
+            print(html.encode('utf-8'))
+            if html.endswith('\x00'):
+                html = html[:-1]
+                source.setHtml(html)
+            if self.allow_inline_tables:
+                cursor.insertHtml(html)
+            else:
+                doc = xml.dom.minidom.parseString(html)
+                tables = doc.getElementsByTagName('table')
+                if len(tables):
+                    for tab in tables:
+                        cursor.insertHtml('<a href="%s" style="color:blue">▦</a>' % len(self.tables))
+                        self.tables.append(tab)
 
-        if source.hasUrls():
+                else:
+                    cursor.insertHtml(html)
+
+            return
+
+        elif source.hasUrls():
             for u in source.urls():
                 file_ext = splitext(str(u.toLocalFile()))
                 if u.isLocalFile() and file_ext in IMAGE_EXTENSIONS:
@@ -124,10 +158,12 @@ class MegasolidEditor(QMainWindow):
         super(MegasolidEditor, self).__init__(*args, **kwargs)
         self.left_widget = None
         self.right_widget = None
-    def reset(self, x=100, y=100, width=840, height=600, use_icons=True, use_menu=True, use_monospace=True):
+
+    def reset(self, x=100, y=100, width=840, height=600, use_icons=True, use_menu=True, use_monospace=True, allow_inline_tables=True):
         self.setGeometry(x, y, width, height)
         layout = QHBoxLayout()
         self.editor = TextEdit()
+        self.editor.allow_inline_tables=allow_inline_tables
         # Set up the QTextEdit editor configuration
         self.editor.setAutoFormatting(QTextEdit.AutoFormattingFlag.AutoAll)
         self.editor.selectionChanged.connect(self.update_format)
@@ -589,6 +625,8 @@ class MegasolidEditor(QMainWindow):
 
 class MegasolidCodeEditor( MegasolidEditor ):
     def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False):
+        self.tables = []
+
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
@@ -606,10 +644,20 @@ class MegasolidCodeEditor( MegasolidEditor ):
             self.right_widget = container
             self.images_layout = layout
 
-        super(MegasolidCodeEditor,self).reset(x,y,width,height, use_icons=use_icons, use_menu=use_menu, use_monospace=True)
+        super(MegasolidCodeEditor,self).reset(
+            x,y,width,height, 
+            use_icons=use_icons, 
+            use_menu=use_menu, 
+            use_monospace=True, 
+            allow_inline_tables=False)
+
+        self.editor.tables = self.tables
 
         self.setStyleSheet('background-color:rgb(42,42,42); color:lightgrey')
         self.editor.setStyleSheet('background-color:rgb(42,42,42); color:white')
+
+        self.editor.on_link_clicked = lambda url: self.on_link_clicked(url)
+
         self.timer = QTimer()
         self.timer.timeout.connect(self.loop)
         self.timer.start(3000)
@@ -622,6 +670,12 @@ class MegasolidCodeEditor( MegasolidEditor ):
         act.setChecked(True)
         act.toggled.connect( lambda x,a=act: self.toggle_syntax_highlight(x,a) )
         self.format_toolbar.addAction(act)
+
+
+    def on_link_clicked(self, url):
+        if url.isdigit():
+            index = int(url)
+            print('clicked on table:', index)
 
     def toggle_syntax_highlight(self, val, btn):
         self.use_syntax_highlight = val
@@ -685,7 +739,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
     def tokenize(self, txt):
         toks = []
         for c in txt:
-            if c==self.OBJ_REP:
+            if c==self.OBJ_REP or c==self.OBJ_TABLE:
                 toks.append(c)
             elif c in (' ', '\t'):
                 if not toks or type(toks[-1]) is not list:
@@ -704,16 +758,34 @@ class MegasolidCodeEditor( MegasolidEditor ):
     ## https://qthub.com/static/doc/qt5/qtgui/qtextdocument.html#toPlainText
     ## Note: Embedded objects, such as images, are represented by a Unicode value U+FFFC (OBJECT REPLACEMENT CHARACTER).
     OBJ_REP = chr(65532)
+    OBJ_TABLE = '▦' #'\x00'
     def loop(self):
         if not self.use_syntax_highlight:
             return
         h = self.editor.toHtml()
         if h != self.prev_html:
-            d = xml.dom.minidom.parseString(h)
+            if '\x00' in h:
+                ## this can happen on copy and paste from libreoffice a null byte at the end
+                h = h.replace('\x00', '')
+
+            try:
+                d = xml.dom.minidom.parseString(h)
+            except xml.parsers.expat.ExpatError as err:
+                for i,ln in enumerate(h.splitlines()):
+                   print(i+1,ln.encode('utf-8'))
+                raise err
+
+            tables = [elt for elt in d.getElementsByTagName('table')]
+            if tables:
+                self.tables = tables
             images = [img.getAttribute('src') for img in d.getElementsByTagName('img')]
 
             txt = self.editor.toPlainText()
+            print('-'*80)
+            print(txt.encode('utf-8'))
+            print('_'*80)
             toks = self.tokenize(txt)
+            print(toks)
 
             cur = self.editor.textCursor()
             pos = cur.position()
@@ -721,9 +793,37 @@ class MegasolidCodeEditor( MegasolidEditor ):
             p = doc.createElement('p')
             p.setAttribute('style', 'margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; white-space: pre-wrap;')
             img_index = 0
+            tab_index = 0
+            nodes = []
             #print(images)
             for tok in toks:
-                if tok==self.OBJ_REP:
+                if tok==self.OBJ_TABLE:
+                    tab = self.tables[tab_index]
+                    print(tab)
+                    print(tab.toxml())
+                    anchor = doc.createElement('a')
+                    anchor.setAttribute('href', str(tab_index))
+                    anchor.setAttribute('style', 'color:cyan')
+                    anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
+                    nodes.append(anchor)
+                    tab_index += 1
+
+                    if False:
+                        tab_n = len(tab.getElementsByTagName('br'))
+                        tab_n += len(tab.getElementsByTagName('tr'))
+                        tab_n += len(tab.getElementsByTagName('td'))
+                        tab_n += 1
+                        print('tab_n', tab_n)
+                        nodes.reverse()
+                        while tab_n:
+                            print(nodes)
+                            elt=nodes.pop()
+                            if elt.nodeType==elt.ELEMENT_NODE and elt.tagName=='br':
+                                tab_n -= 1
+                        nodes.reverse()
+                        nodes.append(tab)
+                        nodes.append(doc.createTextNode(self.OBJ_TABLE))
+                elif tok==self.OBJ_REP:
                     img = doc.createElement('img')
                     src = images[ img_index ]
                     if CONVERT and not src.startswith('/tmp'):
@@ -749,19 +849,28 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
                     img_index += 1
                     img.setAttribute('src', src)
-                    p.appendChild(img)
+                    #p.appendChild(img)
+                    nodes.append(img)
                 elif type(tok) is bytes:
-                    p.appendChild(doc.createElement('br'))
+                    assert tok==b'\n'
+                    #p.appendChild(doc.createElement('br'))
+                    nodes.append( doc.createElement('br') )
                 elif type(tok) is str:
                     if tok in self.SYNTAX:
                         f = doc.createElement('font')
                         f.setAttribute('color', self.SYNTAX[tok])
                         f.appendChild(doc.createTextNode(tok))
-                        p.appendChild(f)
+                        #p.appendChild(f)
+                        nodes.append(f)
                     else:
-                        p.appendChild(doc.createTextNode(tok))
+                        #p.appendChild(doc.createTextNode(tok))
+                        nodes.append(doc.createTextNode(tok))
                 elif type(tok) in (list,tuple):
-                    p.appendChild(doc.createTextNode(''.join(tok)))
+                    #p.appendChild(doc.createTextNode(''.join(tok)))
+                    nodes.append(doc.createTextNode(''.join(tok)))
+
+            for elt in nodes:
+                p.appendChild(elt)
 
             html = p.toxml()
             html = html.replace('<br />', '<br/>')
