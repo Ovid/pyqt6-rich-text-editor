@@ -1,3 +1,9 @@
+# Megasolid Code — A rich text code editor in PySide6
+
+* syntax highlighting for: zig, c3, and python
+* insert: images, tables, and blender files
+
+
 # Megasolid Idiom — A rich text editor in PySide6
 
 Python GUIs has a great example of [a rich-text editor in
