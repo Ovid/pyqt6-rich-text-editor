@@ -8,6 +8,7 @@ def dump_blend(out):
     greases = {}
     fonts  = {}
     materials = {}
+    collections = {}
     selected = []
     dump = {
         'objects':objects,
@@ -15,8 +16,19 @@ def dump_blend(out):
         'greases':greases,
         'fonts':fonts,
         'materials':materials,
+        'collections':collections,
         'selected':[],
+        'active_object' : None,
     }
+    if bpy.context.active_object:
+        dump['active_object']=bpy.context.active_object.name
+    if bpy.context.selected_objects:
+        for ob in bpy.context.selected_objects:
+            dump['selected'].append(ob.name)
+
+    for col in bpy.data.collections:
+        collections[col.name] = [ob.name for ob in col.objects]
+
     for ob in bpy.data.objects:
         p = None
         if ob.parent:
@@ -401,6 +413,8 @@ class MegasolidCodeEditor( MegasolidEditor ):
         for name in dump['objects']:
             btn = QPushButton(name)
             btn.setCheckable(True)
+            if name in dump['selected']:
+                btn.setChecked(True)
             btn.toggled.connect(
                 lambda x,n=name: self.toggle_blend_object(x,n, dump)
             )
