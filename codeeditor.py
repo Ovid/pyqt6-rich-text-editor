@@ -79,7 +79,8 @@ else:
 class MegasolidCodeEditor( MegasolidEditor ):
     def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False, alt_widget=None):
         self.tables = []
-
+        self.blender_symbols = list(self.BLEND_SYMS)
+        self.blend_syms = {}
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
@@ -197,7 +198,8 @@ class MegasolidCodeEditor( MegasolidEditor ):
     def tokenize(self, txt):
         toks = []
         for c in txt:
-            if c==self.OBJ_REP or c==self.OBJ_TABLE or c==self.OBJ_BLEND:
+            #if c==self.OBJ_REP or c==self.OBJ_TABLE or c==self.OBJ_BLEND:
+            if c==self.OBJ_REP or c==self.OBJ_TABLE or c in self.BLEND_SYMS:
                 toks.append(c)
             elif c in (' ', '\t'):
                 if not toks or type(toks[-1]) is not list:
@@ -217,7 +219,8 @@ class MegasolidCodeEditor( MegasolidEditor ):
     ## Note: Embedded objects, such as images, are represented by a Unicode value U+FFFC (OBJECT REPLACEMENT CHARACTER).
     OBJ_REP = chr(65532)
     OBJ_TABLE = '▦' #'\x00'
-    OBJ_BLEND = '🮵'
+    #OBJ_BLEND = '🮵'  ## no font on MS Windows for this :(
+    BLEND_SYMS = 'ก ข ฃ ค ฅ ฆ ง จ ฉ ช ฌ ญ ฎ ฐ ฑ ฒ ณ ต ถ ธ ฤ ป ผ ฝ ฟ ภ ย ล ฦ ว ศ ษ ส ห ฬ อ ฮ ฯ'.split()
     def loop(self):
         if not self.use_syntax_highlight:
             return
@@ -266,12 +269,12 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
                     nodes.append(anchor)
                     tab_index += 1
-                elif tok==self.OBJ_BLEND:
+                elif tok in self.BLEND_SYMS:
                     info = self.blends[blend_index]
                     anchor = doc.createElement('a')
                     anchor.setAttribute('href', 'BLENDER:%s' % blend_index)
-                    anchor.setAttribute('style', 'color:cyan')
-                    anchor.appendChild(doc.createTextNode(self.OBJ_BLEND))
+                    anchor.setAttribute('style', 'color:cyan; font-size:32px;')
+                    anchor.appendChild(doc.createTextNode(tok))
                     nodes.append(anchor)
                     blend_index += 1
                 elif tok==self.OBJ_REP:
@@ -341,10 +344,17 @@ class MegasolidCodeEditor( MegasolidEditor ):
             cur.setPosition(pos)
             self.editor.setTextCursor(cur)
 
+    def get_blend_symbol(self, url):
+        if url not in self.blend_syms:
+            self.blend_syms[url] = self.blender_symbols.pop()
+        return self.blend_syms[url]
+
     def on_new_blend(self, url, document, cursor):
         print('got blender file:', url)
-        cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), self.OBJ_BLEND))
-        #self.blends.append(url)
+        #cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), self.OBJ_BLEND))
+        sym = self.get_blend_symbol(url)
+        cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), sym))
+
         info = self.parse_blend(url)
         info['URL'] = url
         self.blends.append(info)
@@ -362,6 +372,11 @@ class MegasolidCodeEditor( MegasolidEditor ):
         container = QWidget()
         container.setLayout(layout)
         url = dump['URL']
+
+        qsym = QLabel(self.blend_syms[url])
+        qsym.setStyleSheet('font-size:64px; color:cyan;')
+        layout.addWidget(qsym)
+
         a,b = os.path.split(url)
         btn = QPushButton('open: '+b)
         btn.setStyleSheet('background-color:gray; color:white')
@@ -460,7 +475,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
             arr = self.table_to_code(tab)
             print(arr)
             QToolTip.showText(event.globalPosition().toPoint(), arr)
-        elif sym==self.OBJ_BLEND:
+        elif sym in self.BLEND_SYMS:
             info = self.blends[ int(url.split(':')[-1]) ]
             tip = info['URL'] + '\nselected:\n'
             if len(info['selected']):
