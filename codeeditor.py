@@ -45,12 +45,36 @@ def dump_blend(out):
     print('saving:', out)
     open(out,'wb').write(json.dumps(dump).encode('utf-8'))
 
+def render_blend(out):
+    import bpy
+    scn = bpy.data.scenes[0]
+    scn.render.resolution_x = 256
+    scn.render.resolution_y = 256
+    scn.eevee.taa_render_samples = 8
+    scn.render.filepath = out
+    bpy.ops.render.render(write_still=True)
+
 for arg in sys.argv:
     if arg.startswith('--dump-blend='):
         dump_blend(arg.split('=')[-1])
         sys.exit()
+    elif arg.startswith('--render='):
+        render_blend(arg.split('=')[-1])
+        sys.exit()
 
 from wordprocessor import *
+
+if sys.platform == 'win32':
+    BLENDER = 'C:/Program Files/Blender Foundation/Blender 4.2/blender.exe'
+    if not os.path.isfile(BLENDER):
+        BLENDER = 'C:/Program Files/Blender Foundation/Blender 3.6/blender.exe'
+elif sys.platform == 'darwin':
+    BLENDER = '/Applications/Blender.app/Contents/MacOS/Blender'
+else:
+    BLENDER = 'blender'
+    if os.path.isfile(os.path.expanduser('~/Downloads/blender-4.2.1-linux-x64/blender')):
+        BLENDER = os.path.expanduser('~/Downloads/blender-4.2.1-linux-x64/blender')
+
 
 class MegasolidCodeEditor( MegasolidEditor ):
     def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False):
@@ -65,6 +89,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.left_widget = container
         self.images_layout = None
         self.qimages = {}
+        self.blend_previews = {}
 
         layout = QVBoxLayout()
         container = QWidget()
@@ -327,7 +352,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.images_layout.addWidget(self.blend_to_qt(info))
 
     def open_blend(self, url):
-        cmd = ['blender', url]
+        cmd = [BLENDER, url]
         print(cmd)
         subprocess.check_call(cmd)
 
@@ -341,6 +366,20 @@ class MegasolidCodeEditor( MegasolidEditor ):
         btn.setStyleSheet('background-color:gray; color:white')
         btn.clicked.connect(lambda : self.open_blend(url))
         layout.addWidget(btn)
+
+        if url not in self.blend_previews:
+            cmd = [BLENDER, url, '--background', '--python', __file__, '--', '--render=/tmp/__blend__.png']
+            print(cmd)
+            subprocess.check_call(cmd)
+            q = QImage('/tmp/__blend__.png')
+            qpix = QPixmap.fromImage(q)
+            self.blend_previews[url]=qpix
+
+        qlab = QLabel()
+        qlab.setPixmap(self.blend_previews[url])
+        layout.addWidget(qlab)
+
+
         layout.addStretch(1)
 
         for name in dump['objects']:
@@ -362,7 +401,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
                 info['selected'].remove(name)
 
     def parse_blend(self, blend):
-        cmd = ['blender', blend, '--background', '--python', __file__, '--', '--dump-blend=/tmp/__blend__.json']
+        cmd = [BLENDER, blend, '--background', '--python', __file__, '--', '--dump-blend=/tmp/__blend__.json']
         print(cmd)
         subprocess.check_call(cmd)
         info = json.loads(open('/tmp/__blend__.json').read())
