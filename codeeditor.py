@@ -207,7 +207,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
                 toks[-1].append(c)
             elif c == '\n':
                 toks.append(b'\n')
-            elif c in '()[]{}:':
+            elif c in '()[]{}:.-=+*&^%<>/|':
                 toks.append(tuple([c]))
             else:
                 if not toks or type(toks[-1]) is not str:
