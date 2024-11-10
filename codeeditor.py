@@ -8,12 +8,14 @@ def dump_blend(out):
     greases = {}
     fonts  = {}
     materials = {}
+    selected = []
     dump = {
         'objects':objects,
         'meshes':meshes,
         'greases':greases,
         'fonts':fonts,
         'materials':materials,
+        'selected':[],
     }
     for ob in bpy.data.objects:
         p = None
@@ -169,7 +171,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
     def tokenize(self, txt):
         toks = []
         for c in txt:
-            if c==self.OBJ_REP or c==self.OBJ_TABLE:
+            if c==self.OBJ_REP or c==self.OBJ_TABLE or c==self.OBJ_BLEND:
                 toks.append(c)
             elif c in (' ', '\t'):
                 if not toks or type(toks[-1]) is not list:
@@ -189,6 +191,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
     ## Note: Embedded objects, such as images, are represented by a Unicode value U+FFFC (OBJECT REPLACEMENT CHARACTER).
     OBJ_REP = chr(65532)
     OBJ_TABLE = '▦' #'\x00'
+    OBJ_BLEND = '🮵'
     def loop(self):
         if not self.use_syntax_highlight:
             return
@@ -224,6 +227,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
             p.setAttribute('style', 'margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; white-space: pre-wrap;')
             img_index = 0
             tab_index = 0
+            blend_index = 0
             nodes = []
             for tok in toks:
                 if tok==self.OBJ_TABLE:
@@ -236,6 +240,14 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
                     nodes.append(anchor)
                     tab_index += 1
+                elif tok==self.OBJ_BLEND:
+                    info = self.blends[blend_index]
+                    anchor = doc.createElement('a')
+                    anchor.setAttribute('href', 'BLENDER:%s' % blend_index)
+                    anchor.setAttribute('style', 'color:cyan')
+                    anchor.appendChild(doc.createTextNode(self.OBJ_BLEND))
+                    nodes.append(anchor)
+                    blend_index += 1
                 elif tok==self.OBJ_REP:
                     img = doc.createElement('img')
                     src = images[ img_index ]
@@ -305,7 +317,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
     def on_new_blend(self, url, document, cursor):
         print('got blender file:', url)
-        cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">🮵</a>' % len(self.blends))
+        cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), self.OBJ_BLEND))
         #self.blends.append(url)
         info = self.parse_blend(url)
         info['URL'] = url
@@ -314,17 +326,40 @@ class MegasolidCodeEditor( MegasolidEditor ):
         clear_layout(self.images_layout)
         self.images_layout.addWidget(self.blend_to_qt(info))
 
+    def open_blend(self, url):
+        cmd = ['blender', url]
+        print(cmd)
+        subprocess.check_call(cmd)
 
     def blend_to_qt(self, dump):
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
+        url = dump['URL']
+        a,b = os.path.split(url)
+        btn = QPushButton('open: '+b)
+        btn.setStyleSheet('background-color:gray; color:white')
+        btn.clicked.connect(lambda : self.open_blend(url))
+        layout.addWidget(btn)
+        layout.addStretch(1)
 
         for name in dump['objects']:
             btn = QPushButton(name)
+            btn.setCheckable(True)
+            btn.toggled.connect(
+                lambda x,n=name: self.toggle_blend_object(x,n, dump)
+            )
             layout.addWidget(btn)
 
         return container
+
+    def toggle_blend_object(self, toggle, name, info):
+        if toggle:
+            if name not in info['selected']:
+                info['selected'].append(name)
+        else:
+            if name in info['selected']:
+                info['selected'].remove(name)
 
     def parse_blend(self, blend):
         cmd = ['blender', blend, '--background', '--python', __file__, '--', '--dump-blend=/tmp/__blend__.json']
@@ -346,9 +381,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
         elif url.startswith("BLENDER:"):
             info = self.blends[ int(url.split(':')[-1] ) ]
             url = info['URL']
-            cmd = ['blender', url]
-            print(cmd)
-            subprocess.check_call(cmd)
+            clear_layout(self.images_layout)
+            self.images_layout.addWidget(self.blend_to_qt(info))
+
         elif url in self.qimages:
             qlab = QLabel()
             qlab.setPixmap(self.qimages[url])
@@ -385,6 +420,15 @@ class MegasolidCodeEditor( MegasolidEditor ):
             arr = self.table_to_code(tab)
             print(arr)
             QToolTip.showText(event.globalPosition().toPoint(), arr)
+        elif sym==self.OBJ_BLEND:
+            info = self.blends[ int(url.split(':')[-1]) ]
+            tip = info['URL'] + '\nselected:\n'
+            if len(info['selected']):
+                for name in info['selected']:
+                    tip += '\t'+name + '\n'
+            else:
+                tip = ' (no objects selected)'
+            QToolTip.showText(event.globalPosition().toPoint(), tip)
 
     def table_to_code(self, elt):
         o = []
