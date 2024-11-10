@@ -95,6 +95,7 @@ class TextEdit(QTextEdit):
                 self.mouse_over_symbol = self.toPlainText()[text_position]
                 if self.mouse_over_anchor and hasattr(self, 'on_mouse_over_anchor'):
                     self.on_mouse_over_anchor(event, self.mouse_over_anchor, self.mouse_over_symbol)
+        super(TextEdit,self).mouseMoveEvent(event)
 
     def mousePressEvent(self, e):
         self.anchor = self.anchorAt(e.pos())
