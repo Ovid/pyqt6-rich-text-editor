@@ -179,6 +179,7 @@ class MegasolidEditor(QMainWindow):
         super(MegasolidEditor, self).__init__(*args, **kwargs)
         self.left_widget = None
         self.right_widget = None
+        self.alt_widget = None
 
     def reset(self, x=100, y=100, width=840, height=600, use_icons=True, use_menu=True, use_monospace=True, allow_inline_tables=True):
         self.setGeometry(x, y, width, height)
@@ -206,6 +207,8 @@ class MegasolidEditor(QMainWindow):
         layout.addWidget(self.editor, stretch=1)
         if self.right_widget:
             layout.addWidget(self.right_widget)
+        if self.alt_widget:
+            layout.addWidget(self.alt_widget)
 
         container = QWidget()
         container.setLayout(layout)
