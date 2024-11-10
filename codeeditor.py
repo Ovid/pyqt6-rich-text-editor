@@ -77,7 +77,7 @@ else:
 
 
 class MegasolidCodeEditor( MegasolidEditor ):
-    def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False):
+    def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False, alt_widget=None):
         self.tables = []
 
         layout = QVBoxLayout()
@@ -97,6 +97,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         layout.addStretch(1)
         self.right_widget = container
         self.images_layout = layout
+        self.alt_widget = alt_widget
 
         super(MegasolidCodeEditor,self).reset(
             x,y,width,height, 
