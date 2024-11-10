@@ -560,7 +560,7 @@ class MegasolidEditor(QMainWindow):
     def dialog_critical(self, s):
         dlg = QMessageBox(self)
         dlg.setText(s)
-        dlg.setIcon(QMessageBox.StandardButton.Critical)
+        dlg.setIcon(QMessageBox.Icon.Critical)
         dlg.show()
 
     def file_open(self):
@@ -572,7 +572,7 @@ class MegasolidEditor(QMainWindow):
         )
 
         try:
-            with open(path, "rU") as f:
+            with open(path, "r") as f:
                 text = f.read()
 
         except Exception as e:
