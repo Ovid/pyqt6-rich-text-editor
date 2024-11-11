@@ -477,7 +477,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         cmd = [BLENDER]
         if blends:
             cmd.append(blends[0]['URL'] )
-        cmd += ['--window-geometry','640','100', '800','800', '--python-exit-code','1', '--python', tmp]
+        cmd += ['--window-geometry','640','100', '800','800', '--python-exit-code','1', '--python', os.path.normpath(tmp) ]
         print(cmd)
         subprocess.check_call(cmd)
 
