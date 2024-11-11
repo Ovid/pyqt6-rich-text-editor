@@ -90,11 +90,12 @@ else:
 
 
 class MegasolidCodeEditor( MegasolidEditor ):
-    def reset(self, x=100, y=100, width=930, height=600, use_icons=False, use_menu=False, alt_widget=None):
+    def reset(self, x=100, y=100, width=960, height=600, use_icons=False, use_menu=False, alt_widget=None):
         self.tables = []
         self.blender_symbols = list(self.BLEND_SYMS)
         self.blend_syms = {}
         self.blend_thumbs = {}
+        self.blend_files = {}
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
@@ -147,8 +148,17 @@ class MegasolidCodeEditor( MegasolidEditor ):
         act.toggled.connect( lambda x,a=act: self.toggle_syntax_highlight(x,a) )
         self.format_toolbar.addAction(act)
 
+
+        act = QAction("➤", self)
+        act.setToolTip("run script in blender")
+        act.setStatusTip("run script in blender")
+        act.triggered.connect( self.run_script )
+        self.format_toolbar.addAction(act)
+
+
         if sys.platform=='win32' and not os.path.isdir('/tmp'):
             os.mkdir('/tmp')
+
 
     def toggle_syntax_highlight(self, val, btn):
         self.use_syntax_highlight = val
@@ -386,7 +396,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
         info = self.parse_blend(url)
         info['URL'] = url
+        info['SYMBOL'] = sym
         self.blends.append(info)
+        self.blend_files[url] = info
         if 'THUMB' in info and info['THUMB']:
             self.blend_thumbs[sym] = info['THUMB']
             q = QImage(info['THUMB'])
@@ -395,6 +407,86 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
         clear_layout(self.images_layout)
         self.images_layout.addWidget(self.blend_to_qt(info))
+
+    def get_blend_from_symbol(self, sym):
+        for info in self.blends:
+            if info['SYMBOL'] == sym:
+                return info
+
+    def run_script(self, *args):
+        txt = self.editor.toPlainText()
+        header = [
+            'import bpy',
+        ]
+        py = []
+        blends = []
+        for c in txt:  ## note: not using .splitlines because it removes OBJ_REP?
+            if c in self.BLEND_SYMS:
+                info = self.get_blend_from_symbol(c)
+                sel = info['selected']
+                blends.append(info)
+                if len(blends)==1:
+                    if len(sel) == 0:
+                        py.append('(bpy.data.objects)')
+                    elif len(sel) == 1:
+                        py.append('(bpy.data.objects["%s"])' % sel[0])
+                    else:
+                        names = ['"%s"' % n for n in sel]
+                        py.append('[bpy.data.objects[n] for n in (%s)]' % ','.join(names))
+                else:  ## extra blends must be linked in
+                    header += [
+                    'with bpy.data.libraries.load("%s") as (data_from, data_to):' % info['URL'],
+                    '   data_to.objects=data_from.objects',
+                    ]
+                    if len(sel)==0:
+                        header += [
+                        'for ob in data_to.objects:',
+                        '   if ob is not None: bpy.data.scenes[0].collection.objects.link(ob)',
+                        ]
+                    elif len(sel)==1:
+                        header += [
+                        '__blend__%s=[]' % len(blends),
+                        'for ob in data_to.objects:',
+                        '   if ob is not None and ob.name =="%s":' % sel[0],
+                        '       bpy.data.scenes[0].collection.objects.link(ob)',
+                        '       __blend__%s = ob' % len(blends),
+                        ]
+                        py.append('(__blend__%s)' % len(blends))
+
+                    else:
+                        names = ['"%s"' % n for n in sel]
+                        header += [
+                        '__blend__%s=[]' % len(blends),
+                        'for ob in data_to.objects:',
+                        '   if ob is not None and ob.name in (%s):' % ','.join(names),
+                        '       bpy.data.scenes[0].collection.objects.link(ob)',
+                        '       __blend__%s.append(ob)' % len(blends),
+                        ]
+                        py.append('(__blend__%s)' % len(blends))
+
+                continue
+            if c == self.OBJ_REP:
+                ## TODO images
+                continue
+            py.append(c)
+        py = '\n'.join(header) + '\n' + ''.join(py)
+        print(py)
+        self.show_script(py)
+        tmp='/tmp/__user__.py'
+        open(tmp,'wb').write(py.encode('utf-8'))
+        cmd = [BLENDER]
+        if blends:
+            cmd.append(blends[0]['URL'] )
+        cmd += ['--window-geometry','640','100', '800','800', '--python-exit-code','1', '--python', tmp]
+        print(cmd)
+        subprocess.check_call(cmd)
+
+    def show_script(self, txt):
+        clear_layout(self.images_layout)
+        lab = QLabel(txt)
+        lab.setStyleSheet('font-size:8px')
+        self.images_layout.addWidget(lab)
+
 
     def open_blend(self, url):
         cmd = [BLENDER, url]
