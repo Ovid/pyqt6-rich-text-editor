@@ -1,4 +1,4 @@
-import os, sys, json, subprocess
+import os, sys, json, subprocess, string
 
 def dump_blend(out):
     import bpy
@@ -60,9 +60,9 @@ def dump_blend(out):
 def render_blend(out):
     import bpy
     scn = bpy.data.scenes[0]
-    scn.render.resolution_x = 256
-    scn.render.resolution_y = 256
-    scn.eevee.taa_render_samples = 8
+    scn.render.resolution_x = 128
+    scn.render.resolution_y = 128
+    scn.eevee.taa_render_samples = 4
     scn.render.filepath = out
     bpy.ops.render.render(write_still=True)
 
@@ -75,6 +75,7 @@ for arg in sys.argv:
         sys.exit()
 
 from wordprocessor import *
+import blender_thumbnailer as nailer
 
 if sys.platform == 'win32':
     BLENDER = 'C:/Program Files/Blender Foundation/Blender 4.2/blender.exe'
@@ -93,6 +94,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.tables = []
         self.blender_symbols = list(self.BLEND_SYMS)
         self.blend_syms = {}
+        self.blend_thumbs = {}
         layout = QVBoxLayout()
         container = QWidget()
         container.setLayout(layout)
@@ -166,6 +168,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         'else':'red',
         'class':'red',
         'return':'red',
+        'print' : 'cyan',
     }
     SYNTAX_C = {
         'void'   : 'yellow',
@@ -270,6 +273,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
             tab_index = 0
             blend_index = 0
             nodes = []
+            skip_imgs = []
             for tok in toks:
                 if tok==self.OBJ_TABLE:
                     tab = self.tables[tab_index]
@@ -287,11 +291,21 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.setAttribute('href', 'BLENDER:%s' % blend_index)
                     anchor.setAttribute('style', 'color:cyan; font-size:32px;')
                     anchor.appendChild(doc.createTextNode(tok))
+                    if tok in self.blend_thumbs:
+                        img = doc.createElement('img')
+                        img.setAttribute('src', self.blend_thumbs[tok])
+                        img.setAttribute('width','32')
+                        img.setAttribute('height','32')
+                        skip_imgs.append(self.blend_thumbs[tok])
+                        anchor.appendChild(img)
                     nodes.append(anchor)
                     blend_index += 1
                 elif tok==self.OBJ_REP:
-                    img = doc.createElement('img')
                     src = images[ img_index ]
+                    if src in skip_imgs:
+                        img_index += 1
+                        continue
+                    img = doc.createElement('img')
                     if not src.startswith('/tmp'):
                         q = QImage(src)
                         a,b = os.path.split(src)
@@ -361,15 +375,23 @@ class MegasolidCodeEditor( MegasolidEditor ):
             self.blend_syms[url] = self.blender_symbols.pop()
         return self.blend_syms[url]
 
-    def on_new_blend(self, url, document, cursor):
+    def on_new_blend(self, url, document=None, cursor=None):
         print('got blender file:', url)
         #cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), self.OBJ_BLEND))
         sym = self.get_blend_symbol(url)
+        if cursor is None:
+            cursor = self.editor.textCursor()
+
         cursor.insertHtml('<a href="BLENDER:%s" style="color:blue">%s</a>' % (len(self.blends), sym))
 
         info = self.parse_blend(url)
         info['URL'] = url
         self.blends.append(info)
+        if 'THUMB' in info and info['THUMB']:
+            self.blend_thumbs[sym] = info['THUMB']
+            q = QImage(info['THUMB'])
+            qpix = QPixmap.fromImage(q) #.scaled(64,64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.blend_previews[url] = qpix
 
         clear_layout(self.images_layout)
         self.images_layout.addWidget(self.blend_to_qt(info))
@@ -436,6 +458,16 @@ class MegasolidCodeEditor( MegasolidEditor ):
         subprocess.check_call(cmd)
         info = json.loads(open('/tmp/__blend__.json').read())
         print(info)
+
+        buf,x,y = nailer.blend_extract_thumb(blend)
+        if buf:
+            png = nailer.write_png(buf,x,y)
+            a,b = os.path.split(blend)
+            tmp = '/tmp/%s.thumb.png' % b
+            open(tmp,'wb').write(png)
+            info['THUMB']=tmp
+            print(tmp)
+
         return info
 
     def on_link_clicked(self, url):
@@ -536,8 +568,22 @@ def clear_layout(layout):
         if widget is not None: widget.setParent(None)
 
 if __name__ == "__main__":
+    print('num args:', len(sys.argv))
+    print(sys.argv)
     app = QApplication(sys.argv)
     app.setApplicationName("Megasolid Idiom")
     window = MegasolidCodeEditor()
     window.reset()
+    user_vars = list(string.ascii_letters)
+    user_vars.reverse()
+    for arg in sys.argv[1:]:
+        if arg.endswith('.blend'):
+            cur = window.editor.textCursor()
+            cur.insertText('%s = ' % user_vars.pop())
+            window.on_new_blend(arg)
+            cur.insertText('\n')
+        else:
+            cur.insertText(arg + '\n')
+
+
     app.exec()
