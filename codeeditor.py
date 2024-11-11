@@ -472,12 +472,15 @@ class MegasolidCodeEditor( MegasolidEditor ):
         py = '\n'.join(header) + '\n' + ''.join(py)
         print(py)
         self.show_script(py)
-        tmp='/tmp/__user__.py'
+        if sys.platform=='win32':
+            tmp='C:\\tmp\\__user__.py'
+        else:
+            tmp='/tmp/__user__.py'
         open(tmp,'wb').write(py.encode('utf-8'))
         cmd = [BLENDER]
         if blends:
             cmd.append(blends[0]['URL'] )
-        cmd += ['--window-geometry','640','100', '800','800', '--python-exit-code','1', '--python', os.path.normpath(tmp) ]
+        cmd += ['--window-geometry','640','100', '800','800', '--python-exit-code','1', '--python', tmp ]
         print(cmd)
         subprocess.check_call(cmd)
 
