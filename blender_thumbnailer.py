@@ -62,11 +62,13 @@ def open_wrapper_get():
 
     def open_local_url(url, mode='r'):
         o = urlparse(url)
-        if o.scheme == '':
+        if o.scheme == '' or o.scheme=='c':
             path = o.path
         elif o.scheme == 'file':
             path = unquote(o.path)
         else:
+            print(url)
+            print(o.path)
             raise(IOError('URL scheme "%s" needs gi.repository.Gio module' % o.scheme))
         return open(path, mode)
 

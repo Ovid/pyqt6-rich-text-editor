@@ -155,6 +155,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
         act.triggered.connect( self.run_script )
         self.format_toolbar.addAction(act)
 
+        self.extra_syms = {}
+        self.extra_syms_style = {}
+        self.on_sym_clicked = {}
 
         if sys.platform=='win32' and not os.path.isdir('/tmp'):
             os.mkdir('/tmp')
@@ -295,7 +298,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
                     nodes.append(anchor)
                     tab_index += 1
-                elif tok in self.BLEND_SYMS:
+                elif type(tok) is str and tok in self.BLEND_SYMS:
                     info = self.blends[blend_index]
                     anchor = doc.createElement('a')
                     anchor.setAttribute('href', 'BLENDER:%s' % blend_index)
@@ -310,6 +313,16 @@ class MegasolidCodeEditor( MegasolidEditor ):
                         anchor.appendChild(img)
                     nodes.append(anchor)
                     blend_index += 1
+                elif type(tok) is str and tok in self.extra_syms:
+                    anchor = doc.createElement('a')
+                    anchor.setAttribute('href', tok)
+                    if tok in self.extra_syms_style:
+                        anchor.setAttribute('style', self.extra_syms_style[tok])
+                    else:
+                        anchor.setAttribute('style', 'color:cyan; font-size:32px;')
+                    anchor.appendChild(doc.createTextNode(tok))
+                    nodes.append(anchor)
+
                 elif tok==self.OBJ_REP:
                     src = images[ img_index ]
                     if src in skip_imgs:
@@ -579,6 +592,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
             url = info['URL']
             clear_layout(self.images_layout)
             self.images_layout.addWidget(self.blend_to_qt(info))
+
+        elif url in self.on_sym_clicked:
+            self.on_sym_clicked[url](url)
 
         elif url in self.qimages:
             qlab = QLabel()
