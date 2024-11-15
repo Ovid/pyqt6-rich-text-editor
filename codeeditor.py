@@ -298,7 +298,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
                     anchor.appendChild(doc.createTextNode(self.OBJ_TABLE))
                     nodes.append(anchor)
                     tab_index += 1
-                elif tok in self.BLEND_SYMS:
+                elif type(tok) is str and tok in self.BLEND_SYMS:
                     info = self.blends[blend_index]
                     anchor = doc.createElement('a')
                     anchor.setAttribute('href', 'BLENDER:%s' % blend_index)
@@ -313,7 +313,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
                         anchor.appendChild(img)
                     nodes.append(anchor)
                     blend_index += 1
-                elif tok in self.extra_syms:
+                elif type(tok) is str and tok in self.extra_syms:
                     anchor = doc.createElement('a')
                     anchor.setAttribute('href', tok)
                     if tok in self.extra_syms_style:
