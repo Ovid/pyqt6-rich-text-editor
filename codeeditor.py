@@ -158,6 +158,7 @@ class MegasolidCodeEditor( MegasolidEditor ):
         self.extra_syms = {}
         self.extra_syms_style = {}
         self.on_sym_clicked = {}
+        self.on_syntax_highlight_post = None
 
         if sys.platform=='win32' and not os.path.isdir('/tmp'):
             os.mkdir('/tmp')
@@ -386,6 +387,9 @@ class MegasolidCodeEditor( MegasolidEditor ):
 
             html = html.replace('(', '<i style="background-color:black">(')
             html = html.replace(')', ')</i>')
+
+            if self.on_syntax_highlight_post:
+                html = self.on_syntax_highlight_post(html)
 
             self.editor.setHtml(html)
             self.prev_html = self.editor.toHtml()
